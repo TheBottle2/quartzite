@@ -10,6 +10,66 @@ export interface ChangelogEntry {
 // Public CHANGELOG.md gerektiğinde bu listeden üretilir (çift kayıt yok).
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.25', date: '2026-09-12',
+    items: {
+      en: ['Turkish "İ" search now matches correctly; stale highlights cleared when the query changes.'],
+      tr: ['Türkçe "İ" araması artık doğru eşleşiyor; sorgu değişince eski vurgular temizleniyor.'],
+      de: ['Suche mit türkischem "İ" funktioniert korrekt; alte Hervorhebungen werden gelöscht.'],
+      fr: ['La recherche avec "İ" turc fonctionne ; les anciens surlignages sont effacés.'],
+      es: ['La búsqueda con "İ" turca ya coincide; los resaltados antiguos se limpian.'],
+    },
+  },
+  {
+    version: '0.2.24', date: '2026-09-12',
+    items: {
+      en: ['Search hits no longer point to wrong regions (live content + exact mirror metrics).'],
+      tr: ['Arama isabetleri artık yanlış bölgeleri göstermiyor (canlı içerik + birebir hizalama).'],
+      de: ['Suchtreffer zeigen keine falschen Bereiche mehr (live Inhalt + exakte Metriken).'],
+      fr: ['Les résultats ne pointent plus vers des zones erronées (contenu live + métriques exactes).'],
+      es: ['Los resultados ya no señalan zonas erróneas (contenido vivo + métricas exactas).'],
+    },
+  },
+  {
+    version: '0.2.23', date: '2026-09-12',
+    items: {
+      en: ['Search result opens the file and scrolls the list to its folder.'],
+      tr: ['Arama sonucu dosyayı açar ve listeyi klasörüne kaydırır.'],
+      de: ['Suchergebnis öffnet die Datei und scrollt die Liste zum Ordner.'],
+      fr: ['Le résultat ouvre le fichier et fait défiler la liste vers son dossier.'],
+      es: ['El resultado abre el archivo y desplaza la lista a su carpeta.'],
+    },
+  },
+  {
+    version: '0.2.22', date: '2026-09-12',
+    items: {
+      en: ['Click a search hit to jump to it; rename files inline (Enter/Esc).'],
+      tr: ['Arama isabetine tıklayınca atlar; dosyaları satır içinde yeniden adlandır (Enter/Esc).'],
+      de: ['Klick auf einen Treffer springt hin; Dateien inline umbenennen (Enter/Esc).'],
+      fr: ['Cliquez sur un résultat pour y aller ; renommage inline (Entrée/Échap).'],
+      es: ['Clic en un resultado para saltar a él; renombrar archivos en línea (Enter/Esc).'],
+    },
+  },
+  {
+    version: '0.2.21', date: '2026-09-12',
+    items: {
+      en: ['Folder tree in sidebar (expandable, remembered) + vault-wide search of names and contents.'],
+      tr: ['Kenar çubuğunda klasör ağacı (açılır, hatırlanır) + vault geneli ad ve içerik araması.'],
+      de: ['Ordnerbaum in der Sidebar (ausklappbar, gemerkt) + Vault-weite Suche.'],
+      fr: ['Arborescence de dossiers dans la barre latérale + recherche dans tout le vault.'],
+      es: ['Árbol de carpetas en la barra lateral + búsqueda en todo el vault.'],
+    },
+  },
+  {
+    version: '0.2.20', date: '2026-09-12',
+    items: {
+      en: ['Renamed to Quartzite.'],
+      tr: ['Quartzite olarak yeniden adlandırıldı.'],
+      de: ['In Quartzite umbenannt.'],
+      fr: ['Renommé en Quartzite.'],
+      es: ['Renombrado a Quartzite.'],
+    },
+  },
+  {
     version: '0.2.18', date: '2026-09-09',
     items: {
       en: ['Search highlight no longer drifts on scrolled documents.'],
