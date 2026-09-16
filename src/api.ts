@@ -44,6 +44,10 @@ export async function createFile(name: string): Promise<void> {
   return invoke('create_file', { name });
 }
 
+export async function createFolder(name: string): Promise<void> {
+  return invoke('create_folder', { name });
+}
+
 export async function deleteFile(name: string): Promise<void> {
   return invoke('delete_file', { name });
 }

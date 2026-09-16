@@ -299,6 +299,33 @@ async fn rename_file(state: State<'_, VaultState>, old: String, new: String) -> 
     Ok(())
 }
 #[command]
+async fn create_folder(state: State<'_, VaultState>, name: String) -> Result<(), String> {
+    let vault_path = state
+        .path
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or("No vault opened")?;
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err("Invalid folder name".into());
+    }
+    let rel = Path::new(trimmed);
+    if rel.is_absolute() || trimmed.split('/').any(|seg| seg == ".." || seg.is_empty()) {
+        return Err("Invalid path".into());
+    }
+    let abs = vault_path.join(rel);
+    if !abs.starts_with(&vault_path) {
+        return Err("Invalid path".into());
+    }
+    if abs.exists() {
+        return Err("Folder already exists".into());
+    }
+    fs::create_dir_all(&abs).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[command]
 async fn select_vault_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
     use std::sync::mpsc;
 
@@ -330,6 +357,7 @@ fn main() {
             get_backlinks,
             get_all_files,
             create_file,
+            create_folder,
             delete_file,
             rename_file,
             select_vault_folder

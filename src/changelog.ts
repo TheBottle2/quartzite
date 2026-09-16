@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 // Public CHANGELOG.md gerektiğinde bu listeden üretilir (çift kayıt yok).
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.26', date: '2026-09-12',
+    items: {
+      en: ['Search now centers the match in the editor, even in long wrapped documents.', 'Create folders from the sidebar; new notes can include subfolders via "/".'],
+      tr: ['Arama artık eşleşmeyi — uzun ve sarılmış belgelerde bile — ekranın ortasına getiriyor.', 'Kenar çubuğundan klasör oluşturma; yeni not adında "/" ile alt klasör oluşturma.'],
+      de: ['Die Suche zentriert den Treffer jetzt — auch in langen, umgebrochenen Dokumenten.', 'Ordner über die Seitenleiste erstellen; neuer Notizname mit "/" für Unterordner.'],
+      fr: ['La recherche centre désormais le résultat — même dans les longs documents enroulés.', 'Créer des dossiers depuis la barre latérale ; "/" dans le nom pour un sous-dossier.'],
+      es: ['La búsqueda centra ahora el resultado — incluso en documentos largos con ajuste.', 'Crear carpetas desde la barra lateral; "/" en el nombre para subcarpeta.'],
+    },
+  },
+  {
     version: '0.2.25', date: '2026-09-12',
     items: {
       en: ['Turkish "İ" search now matches correctly; stale highlights cleared when the query changes.'],

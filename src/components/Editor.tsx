@@ -54,12 +54,8 @@ export function Editor({
     if (!ta || !mirror) return;
     mirror.scrollTop = ta.scrollTop;
     mirror.scrollLeft = ta.scrollLeft;
-    // Textarea'nın dikey kaydırma çubuğu içerik kutusunu daraltır; mirror'da
-    // aynı oluğu bırakmazsak satır kaymaları tutmaz ve vurgu gittikçe kayar.
     const gutter = ta.offsetWidth - ta.clientWidth;
     mirror.style.paddingRight = `${20 + Math.max(0, gutter)}px`;
-    // Satır kaydırma birebir tutsun diye metrikleri textarea'dan kopyala:
-    // tarayıcı/tema ne yaparsa mirror aynısını yapar (tahmin yok).
     const cs = getComputedStyle(ta);
     mirror.style.fontFamily = cs.fontFamily;
     mirror.style.fontSize = cs.fontSize;
@@ -72,12 +68,40 @@ export function Editor({
     mirror.style.wordBreak = cs.wordBreak;
   }, []);
 
+  const scrollToCurrentMark = useCallback(() => {
+    const ta = textareaRef.current, mirror = mirrorRef.current;
+    if (!ta || !mirror) return false;
+    const mark = mirror.querySelector('mark.current') as HTMLElement | null;
+    if (!mark) return false;
+    const targetTop = mark.offsetTop - mirror.clientHeight / 2 + mark.offsetHeight / 2;
+    const maxTop = Math.max(0, mirror.scrollHeight - mirror.clientHeight);
+    const top = Math.max(0, Math.min(targetTop, maxTop));
+    mirror.scrollTop = top;
+    ta.scrollTop = top;
+    if (mirror.scrollWidth > mirror.clientWidth) {
+      const targetLeft = mark.offsetLeft - mirror.clientWidth / 2 + mark.offsetWidth / 2;
+      const maxLeft = Math.max(0, mirror.scrollWidth - mirror.clientWidth);
+      const left = Math.max(0, Math.min(targetLeft, maxLeft));
+      mirror.scrollLeft = left;
+      ta.scrollLeft = left;
+    }
+    return true;
+  }, []);
+
   // Katman her belirdiğinde/güncellendiğinde kaydırma + oluğu eşitle.
   // Yoksa textarea kaydırılmışken açılan mirror tepede (scrollTop=0) kalır ve
   // ilk scroll'a kadar boş/yanlış bölümü işaretler.
   useLayoutEffect(() => {
     if (showSearchBar && searchInfo.query.length > 0) syncMirrorScroll();
   }, [showSearchBar, searchInfo, content, syncMirrorScroll]);
+
+  // Vurgu ortaya çıksın: sorgu değişince ilk isabeti de ortala (seçim yokken
+  // bile). Seçime bağlı ortala zaten selectRange içinde yapılıyor.
+  useLayoutEffect(() => {
+    if (showSearchBar && searchInfo.query.length > 0 && searchInfo.matches.length > 0) {
+      requestAnimationFrame(() => { scrollToCurrentMark(); });
+    }
+  }, [showSearchBar, searchInfo, scrollToCurrentMark]);
 
   // ---- Undo/Redo (ref tabanlı, dosya değişiminde sıfırlanır) ----
   const historyRef = useRef<HistoryEntry[]>([]);
@@ -175,17 +199,26 @@ export function Editor({
     if (!ta) return;
     ta.focus();
     ta.setSelectionRange(start, end);
+    // İlk yaklaşım: satır sayısı (hızlı). Mirror ölçümü bir kare sonra
+    // hassas şekilde ortalar — sarma/ölçü farkı kalmaz.
     const lineHeight = parseFloat(getComputedStyle(ta).lineHeight) || 22;
     const line = ta.value.slice(0, start).split('\n').length - 1;
     ta.scrollTop = Math.max(0, line * lineHeight - ta.clientHeight / 2);
     syncMirrorScroll();
-  }, [syncMirrorScroll]);
+    requestAnimationFrame(() => {
+      if (!scrollToCurrentMark()) requestAnimationFrame(() => { scrollToCurrentMark(); });
+    });
+  }, [syncMirrorScroll, scrollToCurrentMark]);
 
   // Dışarıdan gelen "şu isabete git" isteğini bir kez uygula (arama yönlendirmesi).
+  // Dosya yeni açıldıysa textarea henüz boyalanmamış olabilir — bir kare bekle.
   useEffect(() => {
     if (pendingSelect && pendingSelect.file === fileName) {
-      selectRange(pendingSelect.start, pendingSelect.end);
-      onPendingSelectConsumed();
+      const s = pendingSelect.start, e = pendingSelect.end;
+      requestAnimationFrame(() => {
+        selectRange(s, e);
+        onPendingSelectConsumed();
+      });
     }
   }, [pendingSelect, fileName, selectRange, onPendingSelectConsumed]);
 

@@ -15,6 +15,7 @@ interface SidebarProps {
   onFileHit: (file: string, start: number, end: number) => void;
   onRenameFile: (oldName: string, newName: string) => void;
   onNewNote: () => void;
+  onNewFolder: () => void;
   currentCalendarMonth: Date;
   onCalendarMonthChange: (date: Date) => void;
   onOpenDailyNote: (date: Date) => void;
@@ -28,7 +29,7 @@ const folderOf = (f: string) => (f.includes('/') ? f.slice(0, f.lastIndexOf('/')
 const baseOf = (f: string) => (f.includes('/') ? f.slice(f.lastIndexOf('/') + 1) : f);
 
 export function Sidebar({
-  files, activeFile, activeFileContent, onFileSelect, onDeleteFile, onFileHit, onRenameFile, onNewNote,
+  files, activeFile, activeFileContent, onFileSelect, onDeleteFile, onFileHit, onRenameFile, onNewNote, onNewFolder,
   currentCalendarMonth, onCalendarMonthChange, onOpenDailyNote, noteDates, t, locale, showCalendar,
 }: SidebarProps) {
   const [isCalendarCollapsed, setIsCalendarCollapsed] = useState(() => localStorage.getItem('calendarCollapsed') === 'true');
@@ -338,13 +339,16 @@ export function Sidebar({
           </div>
         </div>
       )}
-      <div className="sidebar-new-note">
-        <button className="btn primary" onClick={onNewNote} style={{ width: '100%', justifyContent: 'center' }}>
+      <div className="sidebar-new-note" style={{ display: 'flex', gap: '8px' }}>
+        <button className="btn primary" onClick={onNewNote} style={{ flex: 1, justifyContent: 'center' }}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           <span style={{ marginLeft: 8 }}>{t('scNewNote')}</span>
+        </button>
+        <button className="btn secondary" onClick={onNewFolder} title={t('createFolder')} aria-label={t('createFolder')} style={{ width: '40px', justifyContent: 'center', padding: '8px' }}>
+          <Icon name="folder" size={16} />
         </button>
       </div>
     </aside>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { readVault, readFile, getAllFiles, createFile, deleteFile, renameFile, selectVaultFolder, writeFile, confirmDialog } from './api';
+import { readVault, readFile, getAllFiles, createFile, createFolder, deleteFile, renameFile, selectVaultFolder, writeFile, confirmDialog } from './api';
 import { getVersion } from '@tauri-apps/api/app';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
@@ -62,6 +62,8 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showNewNoteModal, setShowNewNoteModal] = useState(false);
   const [newNoteName, setNewNoteName] = useState('');
+  const [showNewFolderModal, setShowNewFolderModal] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('theme');
     return (saved === 'dark' || saved === 'light') ? saved as 'dark' | 'light' : 'dark';
@@ -201,6 +203,15 @@ function App() {
     } catch (err) { console.error('Failed to create file:', err); }
   }, [loadFile]);
 
+  const handleNewFolder = useCallback(async (name: string) => {
+    if (!name.trim()) return;
+    try {
+      const folder = name.trim().replace(/^\/+|\/+$/g, '');
+      await createFolder(folder);
+      setFiles(await getAllFiles());
+    } catch (err) { console.error('Failed to create folder:', err); alert(String(err)); }
+  }, []);
+
   const handleDeleteFile = useCallback(async (fileName: string) => {
     try {
       await deleteFile(fileName);
@@ -278,6 +289,11 @@ function App() {
 
   const handleNewNoteCancel = useCallback(() => { setNewNoteName(''); setShowNewNoteModal(false); }, []);
   const handleOpenNewNoteModal = useCallback(() => setShowNewNoteModal(true), []);
+  const handleNewFolderConfirm = useCallback(() => {
+    if (newFolderName.trim()) { handleNewFolder(newFolderName); setNewFolderName(''); setShowNewFolderModal(false); }
+  }, [newFolderName, handleNewFolder]);
+  const handleNewFolderCancel = useCallback(() => { setNewFolderName(''); setShowNewFolderModal(false); }, []);
+  const handleOpenNewFolderModal = useCallback(() => setShowNewFolderModal(true), []);
 
   const handleSetOpacity = useCallback((opacity: number) => {
     const clamped = Math.max(0.6, Math.min(1, opacity));
@@ -451,7 +467,7 @@ function App() {
             <Sidebar
               files={files} activeFile={activeFile} activeFileContent={content} onFileSelect={loadFile} onDeleteFile={handleDeleteFile}
               onFileHit={handleFileHit} onRenameFile={handleRenameFile}
-              onNewNote={handleOpenNewNoteModal} currentCalendarMonth={currentCalendarMonth}
+              onNewNote={handleOpenNewNoteModal} onNewFolder={handleOpenNewFolderModal} currentCalendarMonth={currentCalendarMonth}
               onCalendarMonthChange={setCurrentCalendarMonth} onOpenDailyNote={handleOpenDailyNote}
               noteDates={noteDates} t={t} locale={locale} showCalendar={showCalendar}
             />
@@ -548,11 +564,36 @@ function App() {
                   onChange={(e) => setNewNoteName(e.target.value)} placeholder={t('noteNamePlaceholder')}
                   className="modal-input" autoFocus
                   onKeyDown={(e) => { if (e.key === 'Enter') handleNewNoteConfirm(); if (e.key === 'Escape') handleNewNoteCancel(); }} />
+                <p className="modal-hint" style={{ fontSize: '12px', color: 'var(--fg-muted)', marginTop: '6px' }}>Subfolders with <code style={{ background: 'var(--bg-tertiary)', padding: '1px 5px', borderRadius: '3px' }}>/</code> — e.g. <code>Projects/My Note</code></p>
               </div>
             </div>
             <footer className="modal-footer">
               <button className="btn secondary" onClick={handleNewNoteCancel}>{t('cancel')}</button>
               <button className="btn primary" onClick={handleNewNoteConfirm} disabled={!newNoteName.trim()}>{t('create')}</button>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      {showNewFolderModal && (
+        <div className="modal-overlay" onClick={handleNewFolderCancel} role="dialog" aria-modal="true" aria-labelledby="newfolder-dialog-title">
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <header className="modal-header">
+              <h2 id="newfolder-dialog-title">{t('newFolderTitle')}</h2>
+              <button className="modal-close-btn" onClick={handleNewFolderCancel} aria-label={t('cancel')}><Icon name="x" size={20} /></button>
+            </header>
+            <div className="modal-body">
+              <div className="modal-path-input">
+                <label htmlFor="newfolder-name-input" className="modal-label">{t('folderName')}</label>
+                <input id="newfolder-name-input" type="text" value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)} placeholder={t('folderNamePlaceholder')}
+                  className="modal-input" autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleNewFolderConfirm(); if (e.key === 'Escape') handleNewFolderCancel(); }} />
+              </div>
+            </div>
+            <footer className="modal-footer">
+              <button className="btn secondary" onClick={handleNewFolderCancel}>{t('cancel')}</button>
+              <button className="btn primary" onClick={handleNewFolderConfirm} disabled={!newFolderName.trim()}>{t('createFolder')}</button>
             </footer>
           </div>
         </div>
