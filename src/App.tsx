@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { readVault, readFile, getAllFiles, createFile, createFolder, deleteFile, renameFile, selectVaultFolder, writeFile, confirmDialog } from './api';
+import { readVault, readFile, getAllFiles, getAllFolders, createFile, createFolder, deleteFile, renameFile, selectVaultFolder, writeFile, confirmDialog } from './api';
 import { getVersion } from '@tauri-apps/api/app';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
@@ -52,6 +52,8 @@ const SHORTCUT_LABEL_KEYS: Record<string, string> = {
 function App() {
   const [vaultPath, setVaultPath] = useState<string | null>(() => localStorage.getItem('vaultPath'));
   const [files, setFiles] = useState<string[]>([]);
+  const [folders, setFolders] = useState<string[]>([]);
+  const [sidebarResetKey, setSidebarResetKey] = useState(0);
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -123,6 +125,7 @@ function App() {
       localStorage.setItem('vaultPath', vaultInfo.path);
       updateRecentVaults(vaultInfo.path);
       setFiles(vaultInfo.files);
+      try { setFolders(await getAllFolders()); } catch { setFolders([]); }
       setActiveFile(null);
       setContent('');
     } catch (err) {
@@ -199,8 +202,10 @@ function App() {
       const fileName = name.trim().endsWith('.md') ? name.trim() : `${name.trim()}.md`;
       await createFile(fileName);
       setFiles(await getAllFiles());
+      try { setFolders(await getAllFolders()); } catch { /* ignore */ }
+      setSidebarResetKey(k => k + 1);
       loadFile(fileName);
-    } catch (err) { console.error('Failed to create file:', err); }
+    } catch (err) { console.error('Failed to create file:', err); alert(String(err)); }
   }, [loadFile]);
 
   const handleNewFolder = useCallback(async (name: string) => {
@@ -209,6 +214,8 @@ function App() {
       const folder = name.trim().replace(/^\/+|\/+$/g, '');
       await createFolder(folder);
       setFiles(await getAllFiles());
+      try { setFolders(await getAllFolders()); } catch { /* ignore */ }
+      setSidebarResetKey(k => k + 1);
     } catch (err) { console.error('Failed to create folder:', err); alert(String(err)); }
   }, []);
 
@@ -252,7 +259,10 @@ function App() {
   }, [files, activeFile, t]);
 
   const handleRefresh = useCallback(async () => {
-    if (vaultPath) setFiles(await getAllFiles());
+    if (vaultPath) {
+      setFiles(await getAllFiles());
+      try { setFolders(await getAllFolders()); } catch { /* ignore */ }
+    }
   }, [vaultPath]);
 
   const handleLinkClick = useCallback((link: string) => {
@@ -465,7 +475,7 @@ function App() {
         {showSidebar && (
           <>
             <Sidebar
-              files={files} activeFile={activeFile} activeFileContent={content} onFileSelect={loadFile} onDeleteFile={handleDeleteFile}
+              files={files} folders={folders} resetKey={sidebarResetKey} activeFile={activeFile} activeFileContent={content} onFileSelect={loadFile} onDeleteFile={handleDeleteFile}
               onFileHit={handleFileHit} onRenameFile={handleRenameFile}
               onNewNote={handleOpenNewNoteModal} onNewFolder={handleOpenNewFolderModal} currentCalendarMonth={currentCalendarMonth}
               onCalendarMonthChange={setCurrentCalendarMonth} onOpenDailyNote={handleOpenDailyNote}

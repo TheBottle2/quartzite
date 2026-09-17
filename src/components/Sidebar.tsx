@@ -8,6 +8,8 @@ import type { TFunc } from '../i18n';
 
 interface SidebarProps {
   files: string[];
+  folders: string[];
+  resetKey: number;
   activeFile: string | null;
   activeFileContent: string;
   onFileSelect: (file: string) => void;
@@ -29,7 +31,7 @@ const folderOf = (f: string) => (f.includes('/') ? f.slice(0, f.lastIndexOf('/')
 const baseOf = (f: string) => (f.includes('/') ? f.slice(f.lastIndexOf('/') + 1) : f);
 
 export function Sidebar({
-  files, activeFile, activeFileContent, onFileSelect, onDeleteFile, onFileHit, onRenameFile, onNewNote, onNewFolder,
+  files, folders, resetKey, activeFile, activeFileContent, onFileSelect, onDeleteFile, onFileHit, onRenameFile, onNewNote, onNewFolder,
   currentCalendarMonth, onCalendarMonthChange, onOpenDailyNote, noteDates, t, locale, showCalendar,
 }: SidebarProps) {
   const [isCalendarCollapsed, setIsCalendarCollapsed] = useState(() => localStorage.getItem('calendarCollapsed') === 'true');
@@ -45,6 +47,7 @@ export function Sidebar({
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const debouncedSetQuery = useDebounce(setDebouncedQuery, 300);
+  useEffect(() => { setQuery(''); setDebouncedQuery(''); setContents(new Map()); }, [resetKey]);
 
   // İçerik önbelleği: sadece arama yapılırken doldurulur, dosya listesi değişince atılır.
   const cacheRef = useRef<{ files: string[]; map: Map<string, string> }>({ files, map: new Map() });
@@ -80,18 +83,22 @@ export function Sidebar({
   const sortedFiles = useMemo(() => [...files].sort((a, b) => a.localeCompare(b)), [files]);
 
   const tree = useMemo(() => {
-    const folders = new Map<string, string[]>();
+    const map = new Map<string, string[]>();
     const root: string[] = [];
     for (const f of sortedFiles) {
       const folder = folderOf(f);
       if (!folder) root.push(f);
       else {
-        if (!folders.has(folder)) folders.set(folder, []);
-        folders.get(folder)!.push(f);
+        if (!map.has(folder)) map.set(folder, []);
+        map.get(folder)!.push(f);
       }
     }
-    return { root, folders: [...folders.entries()].sort((a, b) => a[0].localeCompare(b[0])) };
-  }, [sortedFiles]);
+    // Boş klasörleri de göster (dosya yok ama vault'ta var).
+    for (const folder of folders) {
+      if (!map.has(folder)) map.set(folder, []);
+    }
+    return { root, folders: [...map.entries()].sort((a, b) => a[0].localeCompare(b[0])) };
+  }, [sortedFiles, folders]);
 
   // Aktif dosyanın klasörünü otomatik aç (kullanıcının kapattığını ezmeden: sadece açar).
   useEffect(() => {
@@ -242,7 +249,6 @@ export function Sidebar({
     const visible = searching ? folderFiles.filter(fileMatches) : folderFiles;
     const folderHit = searching && folder.toLowerCase().includes(q);
     if (searching && visible.length === 0 && !folderHit) return null;
-    // Aramada isabet varsa klasörü zorla aç; normalde kullanıcı tercihine saygı duy.
     const isOpen = searching ? true : !collapsed[folder];
     const shown = searching ? visible : folderFiles;
     return (
@@ -260,7 +266,9 @@ export function Sidebar({
           <span className="folder-name">{folder}</span>
           <span className="folder-count">{folderFiles.length}</span>
         </button>
-        {isOpen && shown.map((f) => renderFile(f, true))}
+        {isOpen && (shown.length > 0 ? shown.map((f) => renderFile(f, true)) : (
+          <div className="empty-folder-hint" style={{ padding: '4px 8px 6px 32px', fontSize: '11px', color: 'var(--fg-muted)', fontStyle: 'italic' }}>—</div>
+        ))}
       </div>
     );
   };

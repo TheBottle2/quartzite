@@ -70,6 +70,19 @@ fn scan_vault_files(vault_path: &Path) -> Vec<String> {
         .collect()
 }
 
+fn scan_vault_folders(vault_path: &Path) -> Vec<String> {
+    WalkDir::new(vault_path)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_dir())
+        .filter_map(|e| {
+            let rel = e.path().strip_prefix(vault_path).ok()?;
+            let s = rel.to_string_lossy().to_string();
+            if s.is_empty() { None } else { Some(s) }
+        })
+        .collect()
+}
+
 fn extract_wiki_links(content: &str) -> Vec<String> {
     WIKI_LINK_REGEX
         .captures_iter(content)
@@ -201,6 +214,17 @@ async fn get_all_files(state: State<'_, VaultState>) -> Result<Vec<String>, Stri
         .clone()
         .ok_or("No vault opened")?;
     Ok(scan_vault_files(&vault_path))
+}
+
+#[command]
+async fn get_all_folders(state: State<'_, VaultState>) -> Result<Vec<String>, String> {
+    let vault_path = state
+        .path
+        .lock()
+        .unwrap()
+        .clone()
+        .ok_or("No vault opened")?;
+    Ok(scan_vault_folders(&vault_path))
 }
 
 #[command]
@@ -358,6 +382,7 @@ fn main() {
             get_all_files,
             create_file,
             create_folder,
+            get_all_folders,
             delete_file,
             rename_file,
             select_vault_folder

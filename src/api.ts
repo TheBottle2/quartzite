@@ -40,6 +40,10 @@ export async function getAllFiles(): Promise<string[]> {
   return invoke('get_all_files');
 }
 
+export async function getAllFolders(): Promise<string[]> {
+  return invoke('get_all_folders');
+}
+
 export async function createFile(name: string): Promise<void> {
   return invoke('create_file', { name });
 }
