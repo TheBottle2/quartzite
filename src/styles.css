@@ -361,7 +361,12 @@ body.transparent-bg .editor-textarea.with-search { background: transparent !impo
   padding: 2px; border-radius: 4px; flex-shrink: 0;
 }
 .sidebar-search-clear:hover { background: var(--bg-hover); color: var(--fg-primary); }
-.folder-group { margin: 2px 8px; }
+.folder-group { margin: 2px 8px; border-radius: 4px; }
+.folder-group.drag-over { background: var(--accent-alpha); outline: 1px dashed var(--accent); }
+.root-drop-zone { margin: 4px 12px; padding: 6px; border: 1px dashed var(--border); border-radius: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--fg-muted); text-align: center; }
+.root-drop-zone.drag-over { background: var(--accent-alpha); border-color: var(--accent); color: var(--accent); }
+.file-item[draggable="true"] { cursor: grab; }
+.file-item[draggable="true"]:active { cursor: grabbing; opacity: 0.6; }
 .folder-row {
   display: flex; align-items: center; gap: 6px; width: 100%;
   padding: 6px 8px; border: none; border-radius: 4px;

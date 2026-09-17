@@ -223,6 +223,7 @@ function App() {
     try {
       await deleteFile(fileName);
       setFiles(await getAllFiles());
+      try { setFolders(await getAllFolders()); } catch { /* ignore */ }
       if (activeFile === fileName) { setActiveFile(null); setContent(''); }
     } catch (err) { console.error('Failed to delete file:', err); }
   }, [activeFile]);
@@ -254,8 +255,9 @@ function App() {
       }
       await renameFile(oldName, newName);
       setFiles(await getAllFiles());
+      try { setFolders(await getAllFolders()); } catch { /* ignore */ }
       if (activeFile === oldName) setActiveFile(newName);
-    } catch (err) { console.error('Failed to rename file:', err); }
+    } catch (err) { console.error('Failed to rename file:', err); alert(String(err)); }
   }, [files, activeFile, t]);
 
   const handleRefresh = useCallback(async () => {

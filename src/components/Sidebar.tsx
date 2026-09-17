@@ -174,6 +174,31 @@ export function Sidebar({
     onRenameFile(file, folder ? `${folder}/${clean}` : clean);
   };
 
+  // Sürükle-bırak ile klasöre taşı
+  const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
+  const handleDragStart = (e: React.DragEvent, file: string) => {
+    if (searching) { e.preventDefault(); return; }
+    e.dataTransfer.setData('text/plain', file);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  const handleFolderDragOver = (e: React.DragEvent, folder: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverFolder(folder);
+  };
+  const handleFolderDrop = (e: React.DragEvent, targetFolder: string) => {
+    e.preventDefault();
+    setDragOverFolder(null);
+    const src = e.dataTransfer.getData('text/plain');
+    if (!src || !src.endsWith('.md')) return;
+    const srcFolder = folderOf(src);
+    if (srcFolder === targetFolder) return;
+    const base = baseOf(src);
+    const dest = targetFolder ? `${targetFolder}/${base}` : base;
+    if (src === dest) return;
+    onRenameFile(src, dest);
+  };
+
   const renderFile = (file: string, nested: boolean) => {
     const pos = matchPositions.get(file) || [];
     const hits = searching && !nameHits(file) ? pos.length : 0;
@@ -205,11 +230,14 @@ export function Sidebar({
           if (el) rowRefs.current.set(file, el);
           else rowRefs.current.delete(file);
         }}
+        draggable={!searching && renaming === null}
+        onDragStart={(e) => handleDragStart(e, file)}
+        onDragEnd={() => setDragOverFolder(null)}
         className={`file-item${activeFile === file ? ' active' : ''}${nested ? ' nested' : ''}`}
         role="option"
         aria-selected={activeFile === file}
         onClick={() => handleFileClick(file)}
-        title={file}
+        title={searching ? file : `Sürükleyerek klasöre taşı — ${file}`}
       >
         <span className="file-icon" aria-hidden="true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -252,7 +280,13 @@ export function Sidebar({
     const isOpen = searching ? true : !collapsed[folder];
     const shown = searching ? visible : folderFiles;
     return (
-      <div key={folder} className="folder-group">
+      <div
+        key={folder}
+        className={`folder-group${dragOverFolder === folder ? ' drag-over' : ''}`}
+        onDragOver={(e) => handleFolderDragOver(e, folder)}
+        onDragLeave={() => setDragOverFolder((cur) => (cur === folder ? null : cur))}
+        onDrop={(e) => handleFolderDrop(e, folder)}
+      >
         <button
           className="folder-row"
           onClick={() => toggleFolder(folder)}
@@ -284,6 +318,17 @@ export function Sidebar({
       <header className="sidebar-header">
         <span className="sidebar-title">{t('files')}</span>
       </header>
+      {!searching && (
+        <div
+          className={`root-drop-zone${dragOverFolder === '' ? ' drag-over' : ''}`}
+          onDragOver={(e) => handleFolderDragOver(e, '')}
+          onDragLeave={() => setDragOverFolder((cur) => (cur === '' ? null : cur))}
+          onDrop={(e) => handleFolderDrop(e, '')}
+          title="Ana dizine taşı"
+        >
+          — {t('files')} (kök) —
+        </div>
+      )}
       <div className="sidebar-search">
         <span className="sidebar-search-icon" aria-hidden="true"><Icon name="search" size={14} /></span>
         <input
