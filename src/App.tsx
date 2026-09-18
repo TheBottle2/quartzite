@@ -248,6 +248,11 @@ function App() {
   const handleRenameFile = useCallback(async (oldName: string, newName: string) => {
     if (oldName === newName) return;
     try {
+      // Aktif dosyayı taşıyorsak: ekrandaki güncel içeriği ÖNCE diske yaz,
+      // yoksa debounced kayıp eski yolda kopya/boş dosya oluşturur.
+      if (activeFile === oldName) {
+        try { await writeFile(oldName, contentRef.current); } catch { /* ignore */ }
+      }
       if (files.includes(newName)) {
         const ok = await confirmDialog(t('renameExists', { name: newName.replace(/\.md$/, '') }));
         if (!ok) return;

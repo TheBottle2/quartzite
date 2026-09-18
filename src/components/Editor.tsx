@@ -124,6 +124,10 @@ export function Editor({
       historyRef.current = [];
       indexRef.current = -1;
     }
+    // Dosya değişince (yeniden adlandırma/taşıma dahil) bekleyen otomatik
+    // kaydı iptal et — yoksa eski yola tekrar yazar ve kopya/boş dosya oluşur.
+    if (pushTimeout.current) { clearTimeout(pushTimeout.current); pushTimeout.current = null; }
+    pendingSave.current = null;
     syncButtons();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileName, syncButtons]);
