@@ -533,8 +533,10 @@ export function Editor({
               if (noteName) onLinkClick(noteName);
             }
           }}
+          onWheel={handleWheel}
           role="region"
           aria-label="Markdown preview"
+          style={{ fontSize: `${fontSize}px` }}
         >
           {isPreviewEmpty ? (
             <div className="preview-empty">
@@ -542,7 +544,7 @@ export function Editor({
               <div className="preview-empty-text">{t('emptyNote')}</div>
             </div>
           ) : (
-            <div className="preview-content" dangerouslySetInnerHTML={{ __html: previewHtml }} />
+            <div className="preview-content" style={{ fontSize: `${fontSize}px` }} dangerouslySetInnerHTML={{ __html: previewHtml }} />
           )}
         </div>
       </div>
