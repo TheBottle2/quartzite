@@ -20,6 +20,9 @@ interface EditorProps {
   setShowSearchBar: (show: boolean) => void;
   pendingSelect: { file: string; start: number; end: number } | null;
   onPendingSelectConsumed: () => void;
+  wordWrap: boolean;
+  fontSize: number;
+  onFontSizeChange: (n: number) => void;
   t: TFunc;
 }
 
@@ -29,7 +32,7 @@ const MAX_HISTORY = 100;
 export function Editor({
   fileName, content, onContentChange, onLinkClick, onDeleteFile, onOpenVault,
   showEditor, setShowEditor, showSearchBar, setShowSearchBar,
-  pendingSelect, onPendingSelectConsumed, t,
+  pendingSelect, onPendingSelectConsumed, wordWrap, fontSize, onFontSizeChange, t,
 }: EditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -94,6 +97,7 @@ export function Editor({
   useLayoutEffect(() => {
     if (showSearchBar && searchInfo.query.length > 0) syncMirrorScroll();
   }, [showSearchBar, searchInfo, content, syncMirrorScroll]);
+  useLayoutEffect(() => { syncMirrorScroll(); }, [wordWrap, fontSize, syncMirrorScroll]);
 
   // Vurgu ortaya çıksın: sorgu değişince ilk isabeti de ortala (seçim yokken
   // bile). Seçime bağlı ortala zaten selectRange içinde yapılıyor.
@@ -315,7 +319,18 @@ export function Editor({
     if (fileName) { pendingSave.current = { name: fileName, text: newContent }; debouncedSave(fileName, newContent); }
   };
 
+  const clampFont = (n: number) => Math.min(24, Math.max(10, Math.round(n)));
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 1 : -1;
+      onFontSizeChange(clampFont(fontSize + delta));
+    }
+  };
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) { e.preventDefault(); onFontSizeChange(clampFont(fontSize + 1)); return; }
+    if ((e.ctrlKey || e.metaKey) && (e.key === '-' || e.key === '_')) { e.preventDefault(); onFontSizeChange(clampFont(fontSize - 1)); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); onFontSizeChange(14); return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
     if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')) { e.preventDefault(); redo(); return; }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setShowSearchBar(true); return; }
@@ -430,9 +445,19 @@ export function Editor({
               <button className="toolbar-btn" onClick={() => wrapLines('> ')} title={t('formatQuote')}><Icon name="quote" /></button>
               <button className="toolbar-btn" onClick={() => wrapLines('    ')} title={t('formatCode')}><Icon name="code" /></button>
             </div>
-            <div className="editor-textarea-wrap">
+            <div className="editor-textarea-wrap" onWheel={handleWheel}>
               {showMarks && (
-                <div ref={mirrorRef} className="search-mirror" aria-hidden="true">
+                <div
+                  ref={mirrorRef}
+                  className="search-mirror"
+                  aria-hidden="true"
+                  style={{
+                    fontSize: `${fontSize}px`,
+                    whiteSpace: wordWrap ? 'pre-wrap' : 'pre',
+                    overflowWrap: wordWrap ? 'break-word' : 'normal',
+                    wordBreak: wordWrap ? 'break-word' : 'normal',
+                  }}
+                >
                   {renderSearchMarks()}
                 </div>
               )}
@@ -450,6 +475,13 @@ export function Editor({
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"
+                style={{
+                  fontSize: `${fontSize}px`,
+                  whiteSpace: wordWrap ? 'pre-wrap' : 'pre',
+                  overflowWrap: wordWrap ? 'break-word' : 'normal',
+                  wordBreak: wordWrap ? 'break-word' : 'normal',
+                  overflowX: wordWrap ? 'hidden' : 'auto',
+                }}
               />
             </div>
           </div>

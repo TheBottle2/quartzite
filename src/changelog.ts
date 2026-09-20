@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 // Public CHANGELOG.md gerektiğinde bu listeden üretilir (çift kayıt yok).
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.2.27', date: '2026-09-12',
+    items: {
+      en: ['Harmonized long-line handling: Word Wrap toggle + zoom (Ctrl +/- / Ctrl+Wheel, 10–24px), horizontal scroll when wrap is off.'],
+      tr: ['Uzun tek satır için harman: Satır Kaydırma aç/kapat + yakınlaştırma (Ctrl +/- / Ctrl+Tekerlek, 10–24px), kapalıyken yatay kaydırma.'],
+      de: ['Kombinierte Langzeilen-Lösung: Zeilenumbruch-Umschalter + Zoom (Strg +/- / Strg+Rad, 10–24px), horizontaler Scroll ohne Umbruch.'],
+      fr: ['Gestion harmonisée des longues lignes : retour à la ligne activable + zoom (Ctrl +/- / Ctrl+Molette, 10–24px), défilement horizontal si désactivé.'],
+      es: ['Líneas largas armonizadas: ajuste de línea activable + zoom (Ctrl +/- / Ctrl+Rueda, 10–24px), desplazamiento horizontal sin ajuste.'],
+    },
+  },
+  {
     version: '0.2.26', date: '2026-09-12',
     items: {
       en: ['Search now centers the match in the editor, even in long wrapped documents.', 'Create folders from the sidebar; new notes can include subfolders via "/".'],

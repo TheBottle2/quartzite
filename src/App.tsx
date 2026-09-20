@@ -75,6 +75,11 @@ function App() {
     const val = localStorage.getItem('windowOpacity');
     return val ? parseFloat(val) : 0.9;
   });
+  const [wordWrap, setWordWrap] = useState(() => localStorage.getItem('wordWrap') !== 'false');
+  const [editorFontSize, setEditorFontSize] = useState(() => {
+    const v = parseInt(localStorage.getItem('editorFontSize') || '14', 10);
+    return isNaN(v) ? 14 : Math.min(24, Math.max(10, v));
+  });
   const [dailyNotesFolder, setDailyNotesFolder] = useState(() => localStorage.getItem('dailyNotesFolder') || 'Daily/');
   const [lang, setLang] = useState<Lang>(() => {
     const saved = localStorage.getItem('lang') as Lang | null;
@@ -439,6 +444,8 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
+  useEffect(() => { localStorage.setItem('wordWrap', String(wordWrap)); }, [wordWrap]);
+  useEffect(() => { localStorage.setItem('editorFontSize', String(editorFontSize)); }, [editorFontSize]);
 
   useEffect(() => {
     localStorage.setItem('lang', lang);
@@ -513,6 +520,7 @@ function App() {
             showEditor={showEditor} setShowEditor={setShowEditor}
             showSearchBar={showSearchBar} setShowSearchBar={setShowSearchBar}
             pendingSelect={pendingSelect} onPendingSelectConsumed={consumePendingSelect}
+            wordWrap={wordWrap} fontSize={editorFontSize} onFontSizeChange={setEditorFontSize}
             t={t}
           />
         </div>
@@ -732,6 +740,32 @@ function App() {
                       </div>
                     </div>
                   )}
+                </div>
+                <div className="settings-section">
+                  <h3 className="settings-section-title">{t('settingsEditor')}</h3>
+                  <div className="setting-row">
+                    <div className="setting-label">
+                      <span className="setting-label-text">{t('settingsWordWrap')}</span>
+                      <span className="setting-label-desc">{wordWrap ? (lang === 'tr' ? 'Uzun satırlar alt satıra sarılır' : 'Long lines wrap to next line') : (lang === 'tr' ? 'Yatay kaydırma ile tek satır' : 'Horizontal scroll, no wrap')}</span>
+                    </div>
+                    <div className="setting-control">
+                      <label className="toggle-switch">
+                        <input type="checkbox" checked={wordWrap} onChange={() => setWordWrap(!wordWrap)} />
+                        <span className="toggle-slider"></span>
+                      </label>
+                      <span style={{ color: 'var(--fg-muted)', fontSize: '13px', marginRight: '12px' }}>{wordWrap ? t('on') : t('off')}</span>
+                    </div>
+                  </div>
+                  <div className="setting-row">
+                    <div className="setting-label">
+                      <span className="setting-label-text">{t('settingsFontSize')}</span>
+                      <span className="setting-label-desc">{lang === 'tr' ? 'Ctrl +/- veya Ctrl+tekerlek (10–24)' : 'Ctrl +/- or Ctrl+Wheel (10–24)'}</span>
+                    </div>
+                    <div className="setting-control" style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, maxWidth: '300px' }}>
+                      <input type="range" min="10" max="24" step="1" value={editorFontSize} onChange={(e) => setEditorFontSize(parseInt(e.target.value,10))} style={{ flex: 1, accentColor: 'var(--accent)' }} />
+                      <span style={{ color: 'var(--fg-muted)', fontSize: '13px', minWidth: '35px', textAlign: 'right' }}>{editorFontSize}px</span>
+                    </div>
+                  </div>
                 </div>
                 <div className="settings-section">
                   <div className="settings-section-header">
