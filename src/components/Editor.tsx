@@ -327,10 +327,43 @@ export function Editor({
       onFontSizeChange(clampFont(fontSize + delta));
     }
   };
+  // Global zoom (editör odaklı değilken de çalışsın)
+  useEffect(() => {
+    const onWinWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        const target = e.target as HTMLElement | null;
+        if (target && target.closest('.editor-pane')) {
+          e.preventDefault();
+          const delta = e.deltaY < 0 ? 1 : -1;
+          onFontSizeChange(clampFont(fontSize + delta));
+        }
+      }
+    };
+    window.addEventListener('wheel', onWinWheel, { passive: false });
+    return () => window.removeEventListener('wheel', onWinWheel);
+  }, [fontSize, onFontSizeChange]);
+  useEffect(() => {
+    const onWinKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const k = e.key, code = (e as any).code as string | undefined;
+      const isPlus = k === '+' || k === '=' || code === 'Equal' || code === 'NumpadAdd';
+      const isMinus = k === '-' || k === '_' || code === 'Minus' || code === 'NumpadSubtract';
+      const isZero = k === '0' || code === 'Digit0' || code === 'Numpad0';
+      if (isPlus) { e.preventDefault(); onFontSizeChange(clampFont(fontSize + 1)); }
+      else if (isMinus) { e.preventDefault(); onFontSizeChange(clampFont(fontSize - 1)); }
+      else if (isZero) { e.preventDefault(); onFontSizeChange(14); }
+    };
+    window.addEventListener('keydown', onWinKey);
+    return () => window.removeEventListener('keydown', onWinKey);
+  }, [fontSize, onFontSizeChange]);
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '=')) { e.preventDefault(); onFontSizeChange(clampFont(fontSize + 1)); return; }
-    if ((e.ctrlKey || e.metaKey) && (e.key === '-' || e.key === '_')) { e.preventDefault(); onFontSizeChange(clampFont(fontSize - 1)); return; }
-    if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); onFontSizeChange(14); return; }
+    const code = (e as any).code as string | undefined;
+    const isPlus = e.key === '+' || e.key === '=' || code === 'Equal' || code === 'NumpadAdd';
+    const isMinus = e.key === '-' || e.key === '_' || code === 'Minus' || code === 'NumpadSubtract';
+    const isZero = e.key === '0' || code === 'Digit0' || code === 'Numpad0';
+    if ((e.ctrlKey || e.metaKey) && isPlus) { e.preventDefault(); onFontSizeChange(clampFont(fontSize + 1)); return; }
+    if ((e.ctrlKey || e.metaKey) && isMinus) { e.preventDefault(); onFontSizeChange(clampFont(fontSize - 1)); return; }
+    if ((e.ctrlKey || e.metaKey) && isZero) { e.preventDefault(); onFontSizeChange(14); return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
     if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')) { e.preventDefault(); redo(); return; }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); setShowSearchBar(true); return; }
@@ -454,8 +487,9 @@ export function Editor({
                   style={{
                     fontSize: `${fontSize}px`,
                     whiteSpace: wordWrap ? 'pre-wrap' : 'pre',
-                    overflowWrap: wordWrap ? 'break-word' : 'normal',
-                    wordBreak: wordWrap ? 'break-word' : 'normal',
+                    overflowWrap: wordWrap ? 'anywhere' : 'normal',
+                    wordBreak: wordWrap ? 'break-all' : 'normal',
+                    overflowX: wordWrap ? 'hidden' : 'auto',
                   }}
                 >
                   {renderSearchMarks()}
@@ -464,6 +498,7 @@ export function Editor({
               <textarea
                 ref={textareaRef}
                 className={`editor-textarea${showMarks ? ' with-search' : ''}`}
+                wrap={wordWrap ? 'soft' : 'off'}
                 value={content}
                 onChange={handleChange}
                 onKeyDown={handleKeyDown}
@@ -478,8 +513,8 @@ export function Editor({
                 style={{
                   fontSize: `${fontSize}px`,
                   whiteSpace: wordWrap ? 'pre-wrap' : 'pre',
-                  overflowWrap: wordWrap ? 'break-word' : 'normal',
-                  wordBreak: wordWrap ? 'break-word' : 'normal',
+                  overflowWrap: wordWrap ? 'anywhere' : 'normal',
+                  wordBreak: wordWrap ? 'break-all' : 'normal',
                   overflowX: wordWrap ? 'hidden' : 'auto',
                 }}
               />
