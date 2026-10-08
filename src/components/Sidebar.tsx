@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Calendar } from './Calendar';
-import { confirmDialog, readFile } from '../api';
+import { absolutePath, confirmDialog, readFile, revealInFileManager } from '../api';
 import { useDebounce } from '../hooks/useDebounce';
 import { findFoldedMatches, foldCase } from '../utils/search';
 import { Icon } from './Icon';
@@ -12,6 +12,10 @@ interface SidebarProps {
   resetKey: number;
   activeFile: string | null;
   activeFileContent: string;
+  favorites: string[];
+  recentFiles: string[];
+  onToggleFavorite: (file: string) => void;
+  onDeleteFolder: (folder: string) => void;
   onFileSelect: (file: string) => void;
   onDeleteFile: (file: string) => void;
   onFileHit: (file: string, start: number, end: number) => void;
@@ -31,7 +35,7 @@ const folderOf = (f: string) => (f.includes('/') ? f.slice(0, f.lastIndexOf('/')
 const baseOf = (f: string) => (f.includes('/') ? f.slice(f.lastIndexOf('/') + 1) : f);
 
 export function Sidebar({
-  files, folders, resetKey, activeFile, activeFileContent, onFileSelect, onDeleteFile, onFileHit, onRenameFile, onNewNote, onNewFolder,
+  files, folders, resetKey, activeFile, activeFileContent, favorites, recentFiles, onToggleFavorite, onDeleteFolder, onFileSelect, onDeleteFile, onFileHit, onRenameFile, onNewNote, onNewFolder,
   currentCalendarMonth, onCalendarMonthChange, onOpenDailyNote, noteDates, t, locale, showCalendar,
 }: SidebarProps) {
   const [isCalendarCollapsed, setIsCalendarCollapsed] = useState(() => localStorage.getItem('calendarCollapsed') === 'true');
@@ -176,11 +180,14 @@ export function Sidebar({
 
   // Sürükle-bırak ile klasöre taşı
   const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const handleDragStart = (e: React.DragEvent, file: string) => {
     if (searching) { e.preventDefault(); return; }
     e.dataTransfer.setData('text/plain', file);
     e.dataTransfer.effectAllowed = 'move';
+    setDragging(true);
   };
+  const handleDragEnd = () => { setDragging(false); setDragOverFolder(null); };
   const handleFolderDragOver = (e: React.DragEvent, folder: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
@@ -189,6 +196,7 @@ export function Sidebar({
   const handleFolderDrop = (e: React.DragEvent, targetFolder: string) => {
     e.preventDefault();
     setDragOverFolder(null);
+    setDragging(false);
     const src = e.dataTransfer.getData('text/plain');
     if (!src || !src.endsWith('.md')) return;
     const srcFolder = folderOf(src);
@@ -197,6 +205,58 @@ export function Sidebar({
     const dest = targetFolder ? `${targetFolder}/${base}` : base;
     if (src === dest) return;
     onRenameFile(src, dest);
+  };
+
+  // ---- Sağ tık menüsü: yolu kopyala / dosya yöneticisinde aç / sil ----
+  const [menu, setMenu] = useState<{ x: number; y: number; kind: 'file' | 'folder'; path: string } | null>(null);
+  const [menuMsg, setMenuMsg] = useState('');
+
+  const openMenu = (e: React.MouseEvent, kind: 'file' | 'folder', path: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuMsg('');
+    // Ekran sınırına göre konumla (menü taşmasın)
+    const w = 220, h = 120;
+    const x = Math.min(e.clientX, window.innerWidth - w - 8);
+    const y = Math.min(e.clientY, window.innerHeight - h - 8);
+    setMenu({ x: Math.max(8, x), y: Math.max(8, y), kind, path });
+  };
+
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('click', close);
+    window.addEventListener('contextmenu', close);
+    window.addEventListener('resize', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('contextmenu', close);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [menu]);
+
+  const copyPath = async (path: string) => {
+    try {
+      const abs = await absolutePath(path);
+      await navigator.clipboard.writeText(abs);
+      setMenuMsg(t('pathCopied'));
+    } catch (err) {
+      console.error('Failed to copy path:', err);
+      setMenuMsg(t('pathCopyFailed'));
+    }
+  };
+
+  const reveal = async (path: string) => {
+    try {
+      await revealInFileManager(path);
+      setMenu(null);
+    } catch (err) {
+      console.error('Failed to reveal:', err);
+      setMenuMsg(t('revealFailed'));
+    }
   };
 
   const renderFile = (file: string, nested: boolean) => {
@@ -232,11 +292,12 @@ export function Sidebar({
         }}
         draggable={!searching && renaming === null}
         onDragStart={(e) => handleDragStart(e, file)}
-        onDragEnd={() => setDragOverFolder(null)}
+        onDragEnd={handleDragEnd}
         className={`file-item${activeFile === file ? ' active' : ''}${nested ? ' nested' : ''}`}
         role="option"
         aria-selected={activeFile === file}
         onClick={() => handleFileClick(file)}
+        onContextMenu={(e) => openMenu(e, 'file', file)}
         title={searching ? file : `Sürükleyerek klasöre taşı — ${file}`}
       >
         <span className="file-icon" aria-hidden="true">
@@ -251,6 +312,14 @@ export function Sidebar({
         )}
         {activeFile === file && (
           <span className="file-actions">
+            <button
+              className="file-action-btn"
+              onClick={(e) => { e.stopPropagation(); onToggleFavorite(file); }}
+              aria-label={t('toggleFavorite')}
+              title={t('toggleFavorite')}
+            >
+              <Icon name="star" size={12} />
+            </button>
             <button
               className="file-action-btn"
               onClick={(e) => { e.stopPropagation(); startRename(file); }}
@@ -286,20 +355,31 @@ export function Sidebar({
         onDragOver={(e) => handleFolderDragOver(e, folder)}
         onDragLeave={() => setDragOverFolder((cur) => (cur === folder ? null : cur))}
         onDrop={(e) => handleFolderDrop(e, folder)}
+        onContextMenu={(e) => openMenu(e, 'folder', folder)}
       >
-        <button
-          className="folder-row"
-          onClick={() => toggleFolder(folder)}
-          aria-expanded={isOpen}
-          title={isOpen ? t('collapseFolder') : t('expandFolder')}
-        >
-          <svg className={`chevron-icon${isOpen ? '' : ' collapsed'}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-          <span className="folder-icon" aria-hidden="true"><Icon name="folder" size={14} /></span>
-          <span className="folder-name">{folder}</span>
-          <span className="folder-count">{folderFiles.length}</span>
-        </button>
+        <div className="folder-row-wrap">
+          <button
+            className="folder-row"
+            onClick={() => toggleFolder(folder)}
+            aria-expanded={isOpen}
+            title={isOpen ? t('collapseFolder') : t('expandFolder')}
+          >
+            <svg className={`chevron-icon${isOpen ? '' : ' collapsed'}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+            <span className="folder-icon" aria-hidden="true"><Icon name="folder" size={14} /></span>
+            <span className="folder-name">{folder}</span>
+            <span className="folder-count">{folderFiles.length}</span>
+          </button>
+          <button
+            className="folder-more-btn"
+            onClick={(e) => openMenu(e, 'folder', folder)}
+            aria-label={t('folderActions')}
+            title={t('folderActions')}
+          >
+            <Icon name="more-horizontal" size={14} />
+          </button>
+        </div>
         {isOpen && (shown.length > 0 ? shown.map((f) => renderFile(f, true)) : (
           <div className="empty-folder-hint" style={{ padding: '4px 8px 6px 32px', fontSize: '11px', color: 'var(--fg-muted)', fontStyle: 'italic' }}>—</div>
         ))}
@@ -318,7 +398,7 @@ export function Sidebar({
       <header className="sidebar-header">
         <span className="sidebar-title">{t('files')}</span>
       </header>
-      {!searching && (
+      {!searching && dragging && (
         <div
           className={`root-drop-zone${dragOverFolder === '' ? ' drag-over' : ''}`}
           onDragOver={(e) => handleFolderDragOver(e, '')}
@@ -359,8 +439,32 @@ export function Sidebar({
           <div className="empty-state" style={{ padding: '16px', textAlign: 'center', color: 'var(--fg-muted)', fontSize: '13px' }}>
             <div className="empty-state-text">{t('noSearchResults')}</div>
           </div>
+        ) : searching ? (
+          <>
+            {visibleRoot.map((f) => renderFile(f, false))}
+            {tree.folders.map(([folder, fs]) => renderFolder(folder, fs))}
+          </>
         ) : (
           <>
+            {favorites.filter((f) => files.includes(f)).length > 0 && (
+              <div className="folder-group">
+                <div className="folder-row" style={{ cursor: 'default' }}>
+                  <span className="folder-icon" aria-hidden="true"><Icon name="star" size={14} /></span>
+                  <span className="folder-name">{t('favorites')}</span>
+                  <span className="folder-count">{favorites.filter((f) => files.includes(f)).length}</span>
+                </div>
+                {favorites.filter((f) => files.includes(f)).map((f) => renderFile(f, true))}
+              </div>
+            )}
+            {recentFiles.filter((f) => files.includes(f) && f !== activeFile).slice(0, 5).length > 0 && (
+              <div className="folder-group">
+                <div className="folder-row" style={{ cursor: 'default' }}>
+                  <span className="folder-icon" aria-hidden="true"><Icon name="refresh" size={14} /></span>
+                  <span className="folder-name">{t('recentFiles')}</span>
+                </div>
+                {recentFiles.filter((f) => files.includes(f) && f !== activeFile).slice(0, 5).map((f) => renderFile(f, true))}
+              </div>
+            )}
             {visibleRoot.map((f) => renderFile(f, false))}
             {tree.folders.map(([folder, fs]) => renderFolder(folder, fs))}
           </>
@@ -404,6 +508,40 @@ export function Sidebar({
           <Icon name="folder" size={16} />
         </button>
       </div>
+      {menu && (
+        <div
+          className="ctx-menu"
+          role="menu"
+          style={{ left: menu.x, top: menu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="ctx-menu-title" title={menu.path}>{menu.path}</div>
+          <button className="ctx-item" role="menuitem" onClick={() => void copyPath(menu.path)}>
+            <Icon name="copy" size={13} />
+            <span>{t('copyPath')}</span>
+          </button>
+          <button className="ctx-item" role="menuitem" onClick={() => void reveal(menu.path)}>
+            <Icon name="external-link" size={13} />
+            <span>{t('revealInFileManager')}</span>
+          </button>
+          <div className="ctx-sep" role="separator" />
+          <button
+            className="ctx-item danger"
+            role="menuitem"
+            onClick={() => {
+              const target = menu.path;
+              const kind = menu.kind;
+              setMenu(null);
+              if (kind === 'folder') onDeleteFolder(target);
+              else void handleDeleteFile({ stopPropagation: () => {} } as React.MouseEvent, target);
+            }}
+          >
+            <Icon name="trash" size={13} />
+            <span>{menu.kind === 'folder' ? t('deleteFolder') : t('deleteFile')}</span>
+          </button>
+          {menuMsg && <div className="ctx-msg">{menuMsg}</div>}
+        </div>
+      )}
     </aside>
   );
 }

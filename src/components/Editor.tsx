@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useCallback, useState } from 'react';
-import { parseMarkdown, writeFile, confirmDialog } from '../api';
+import { parseMarkdown, writeFile, confirmDialog, readFile } from '../api';
 import { useDebounce } from '../hooks/useDebounce';
 import { renderMathInHtml } from '../math';
+import { enhancePreviewHtml, extractFrontmatter, frontmatterTable, taskLineIndices } from '../utils/preview';
 import { Logo } from './Logo';
 import { Icon } from './Icon';
 import { SearchBar, type SearchMatch } from './SearchBar';
@@ -12,6 +13,9 @@ interface EditorProps {
   content: string;
   onContentChange: (content: string) => void;
   onLinkClick: (link: string) => void;
+  onTagClick?: (tag: string) => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
   onDeleteFile?: (fileName: string) => void;
   onOpenVault?: () => void;
   showEditor: boolean;
@@ -23,6 +27,12 @@ interface EditorProps {
   wordWrap: boolean;
   fontSize: number;
   onFontSizeChange: (n: number) => void;
+  /** dışarıdan içerik değişimi (vault geneli değiştirme): bekleyen kayıt + geçmiş sıfırlanır */
+  contentRevision?: number;
+  /** kaydedilmemiş değişiklik var mı (sekme noktası) — dosya adıyla birlikte */
+  onDirtyChange?: (file: string, dirty: boolean) => void;
+  /** bağlantı önizleme kartı: [[Not]] üzerine gelince hedefi çöz */
+  resolveLink?: (link: string) => string | null;
   t: TFunc;
 }
 
@@ -30,9 +40,9 @@ interface HistoryEntry { content: string; cursorStart: number; cursorEnd: number
 const MAX_HISTORY = 100;
 
 export function Editor({
-  fileName, content, onContentChange, onLinkClick, onDeleteFile, onOpenVault,
+  fileName, content, onContentChange, onLinkClick, onTagClick, isFavorite, onToggleFavorite, onDeleteFile, onOpenVault,
   showEditor, setShowEditor, showSearchBar, setShowSearchBar,
-  pendingSelect, onPendingSelectConsumed, wordWrap, fontSize, onFontSizeChange, t,
+  pendingSelect, onPendingSelectConsumed, wordWrap, fontSize, onFontSizeChange, contentRevision, onDirtyChange, resolveLink, t,
 }: EditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -121,6 +131,15 @@ export function Editor({
   }, []);
 
   useEffect(() => {
+    // Dosya değişmeden ÖNCE bekleyen kaydı eski dosyaya yaz: 2sn debounce
+    // penceresinde başka nota geçmek yazıyı SILERDI. Aynı dosyada revision
+    // bump (vault geneli değiştirme) ise diske yazıldığı için atılır.
+    if (pendingSave.current && pendingSave.current.name !== fileName) {
+      const p = pendingSave.current;
+      pendingSave.current = null;
+      onDirtyChange?.(p.name, false);
+      writeFile(p.name, p.text).catch((err) => console.error('Failed to flush pending save:', err));
+    }
     if (fileName !== null) {
       historyRef.current = [{ content, cursorStart: 0, cursorEnd: 0 }];
       indexRef.current = 0;
@@ -128,13 +147,10 @@ export function Editor({
       historyRef.current = [];
       indexRef.current = -1;
     }
-    // Dosya değişince (yeniden adlandırma/taşıma dahil) bekleyen otomatik
-    // kaydı iptal et — yoksa eski yola tekrar yazar ve kopya/boş dosya oluşur.
     if (pushTimeout.current) { clearTimeout(pushTimeout.current); pushTimeout.current = null; }
-    pendingSave.current = null;
     syncButtons();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fileName, syncButtons]);
+  }, [fileName, contentRevision, syncButtons]);
 
   useEffect(() => () => { if (pushTimeout.current) clearTimeout(pushTimeout.current); }, []);
 
@@ -151,21 +167,41 @@ export function Editor({
 
   const debouncedSave = useDebounce(
     useCallback(async (name: string, text: string) => {
-      try { await writeFile(name, text); pendingSave.current = null; }
+      try { await writeFile(name, text); pendingSave.current = null; onDirtyChange?.(name, false); }
       catch (err) { console.error('Failed to save file:', err); }
-    }, []),
+    }, [onDirtyChange]),
     2000
   );
 
   const debouncedParse = useDebounce(
     useCallback(async (text: string) => {
       try {
-        const result = await parseMarkdown(text);
-        setPreviewHtml(renderMathInHtml(result.html));
+        // Frontmatter Rust'a gitmeden sökülür (çöp render engeli), tablo olarak geri eklenir.
+        const { body, data } = extractFrontmatter(text);
+        const result = await parseMarkdown(body);
+        const rich = enhancePreviewHtml(result.html);
+        setPreviewHtml(renderMathInHtml(frontmatterTable(data) + rich));
       } catch (err) { console.error('Failed to parse markdown:', err); setPreviewHtml(''); }
     }, []),
     300
   );
+
+  // Önizlemede task checkbox'ı: n'inci `- [ ]` satırını çevirir.
+  const toggleTask = useCallback((taskIndex: number) => {
+    const lines = taskLineIndices(content);
+    const lineNo = lines[taskIndex];
+    if (lineNo === undefined) return;
+    const all = content.split('\n');
+    const line = all[lineNo];
+    const next = /\[x\]/i.test(line)
+      ? line.replace(/\[[xX]\]/, '[ ]')
+      : line.replace(/\[[ ]\]/, '[x]');
+    all[lineNo] = next;
+    const newContent = all.join('\n');
+    onContentChange(newContent);
+    pushHistory(newContent, 0, 0);
+    if (fileName) { pendingSave.current = { name: fileName, text: newContent }; debouncedSave(fileName, newContent); }
+  }, [content, fileName, onContentChange, pushHistory, debouncedSave]);
 
   const applyEntry = useCallback((entry: HistoryEntry) => {
     isUndoRedo.current = true;
@@ -316,7 +352,7 @@ export function Editor({
     const end = e.currentTarget.selectionEnd;
     onContentChange(newContent);
     pushHistory(newContent, start, end);
-    if (fileName) { pendingSave.current = { name: fileName, text: newContent }; debouncedSave(fileName, newContent); }
+    if (fileName) { pendingSave.current = { name: fileName, text: newContent }; onDirtyChange?.(fileName, true); debouncedSave(fileName, newContent); }
   };
 
   const clampFont = (n: number) => Math.min(24, Math.max(10, Math.round(n)));
@@ -390,6 +426,69 @@ export function Editor({
     if (ok) onDeleteFile(fileName);
   };
 
+  // ---- Bağlantı önizleme kartı ([[Not]] üzerine gel) ----
+  const [hover, setHover] = useState<{ link: string; title: string; body: string; missing: boolean; x: number; y: number } | null>(null);
+  const hoverCache = useRef<Map<string, string>>(new Map());
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const hideHover = useCallback(() => {
+    if (hoverTimer.current) { clearTimeout(hoverTimer.current); hoverTimer.current = null; }
+    setHover(null);
+  }, []);
+
+  useEffect(() => () => { if (hoverTimer.current) clearTimeout(hoverTimer.current); }, []);
+
+  const showHover = useCallback((link: string, target: HTMLElement) => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    const rect = target.getBoundingClientRect();
+    const pane = previewRef.current?.getBoundingClientRect();
+    const x = pane ? Math.min(rect.left - pane.left + 8, Math.max(8, (pane.width - 320))) : 8;
+    const y = Math.max(8, rect.top - (pane?.top ?? 0) + rect.height + 6);
+    const file = resolveLink?.(link) ?? null;
+    if (!file) {
+      setHover({ link, title: link, body: t('linkPreviewMissing'), missing: true, x, y });
+      return;
+    }
+    const title = file.replace(/\.md$/, '');
+    const cached = hoverCache.current.get(file);
+    if (cached !== undefined) {
+      setHover({ link, title, body: cached || t('emptyNote'), missing: false, x, y });
+      return;
+    }
+    setHover({ link, title, body: t('loading'), missing: false, x, y });
+    hoverTimer.current = setTimeout(async () => {
+      try {
+        const text = await readFile(file);
+        const { body: fmBody } = extractFrontmatter(text);
+        const snippet = fmBody
+          .replace(/```[\s\S]*?```/g, '')
+          .replace(/^#{1,6}\s+.*$/gm, '')
+          .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, n: string, a?: string) => a || n)
+          .replace(/[#>*_`~-]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, 220);
+        hoverCache.current.set(file, snippet);
+        setHover((h) => (h && h.link === link ? { ...h, body: snippet || t('emptyNote'), missing: false } : h));
+      } catch {
+        hoverCache.current.set(file, '');
+        setHover((h) => (h && h.link === link ? { ...h, body: t('emptyNote') } : h));
+      }
+    }, 220);
+  }, [resolveLink, t]);
+
+  const handlePreviewMouseOver = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    const link = target.closest('a[data-wiki-link]') as HTMLElement | null;
+    if (!link) return;
+    const name = link.getAttribute('data-wiki-link');
+    if (name) showHover(name, link);
+  }, [showHover]);
+
+  useEffect(() => {
+    if (!fileName) hoverCache.current = new Map();
+  }, [fileName]);
+
   // Kapanırken bekleyen kaydı yaz
   useEffect(() => () => {
     const p = pendingSave.current;
@@ -438,6 +537,17 @@ export function Editor({
       <header className="editor-header">
         <span className="editor-title">{fileName.replace(/\.md$/, '')}</span>
         <div className="editor-actions">
+          {onToggleFavorite && (
+            <button
+              className={`btn icon-only${isFavorite ? ' active' : ''}`}
+              onClick={onToggleFavorite}
+              aria-pressed={!!isFavorite}
+              aria-label={t('toggleFavorite')}
+              title={t('toggleFavorite')}
+            >
+              <Icon name="star" />
+            </button>
+          )}
           <button
             className="btn icon-only"
             onClick={() => setShowEditor(!showEditor)}
@@ -526,6 +636,26 @@ export function Editor({
           className="preview-pane"
           onClick={(e) => {
             const target = e.target as HTMLElement;
+            const task = target.closest('input.task-checkbox') as HTMLInputElement | null;
+            if (task) {
+              e.preventDefault();
+              toggleTask(parseInt(task.getAttribute('data-task') || '0', 10));
+              return;
+            }
+            const tag = target.closest('a[data-tag]');
+            if (tag) {
+              e.preventDefault();
+              const name = tag.getAttribute('data-tag');
+              if (name && onTagClick) onTagClick(name);
+              return;
+            }
+            const embed = target.closest('[data-embed]');
+            if (embed) {
+              e.preventDefault();
+              const noteName = embed.getAttribute('data-embed');
+              if (noteName) onLinkClick(noteName);
+              return;
+            }
             const link = target.closest('a[data-wiki-link]');
             if (link) {
               e.preventDefault();
@@ -534,6 +664,8 @@ export function Editor({
             }
           }}
           onWheel={handleWheel}
+          onMouseOver={handlePreviewMouseOver}
+          onMouseLeave={hideHover}
           role="region"
           aria-label="Markdown preview"
           style={{ fontSize: `${fontSize}px` }}
@@ -548,6 +680,15 @@ export function Editor({
           )}
         </div>
       </div>
+      {hover && (
+        <div className="link-preview" style={{ left: hover.x, top: hover.y }} role="tooltip">
+          <div className={`link-preview-title${hover.missing ? ' missing' : ''}`}>
+            <Icon name="file" size={12} />
+            <span>{hover.title}</span>
+          </div>
+          <div className="link-preview-body">{hover.body}</div>
+        </div>
+      )}
       {showSearchBar && (
         <SearchBar
           content={content}

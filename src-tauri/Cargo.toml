@@ -1,6 +1,6 @@
 [package]
 name = "quartzite"
-version = "0.2.27"
+version = "0.4.3"
 description = "Local-first Markdown knowledge base"
 authors = ["User <user@example.com>"]
 edition = "2021"

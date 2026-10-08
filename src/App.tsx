@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { readVault, readFile, getAllFiles, getAllFolders, createFile, createFolder, deleteFile, renameFile, selectVaultFolder, writeFile, confirmDialog } from './api';
+import { readVault, readFile, getAllFiles, getAllFolders, createFile, createFolder, deleteFile, deleteFolder, renameFile, selectVaultFolder, writeFile, confirmDialog, getBacklinks } from './api';
+import type { TextMatch } from './utils/search';
 import { getVersion } from '@tauri-apps/api/app';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
 import { BacklinksPane } from './components/BacklinksPane';
 import { GraphModal } from './components/GraphModal';
 import { WhatsNewModal } from './components/WhatsNewModal';
+import { CommandPalette, type PaletteCommand } from './components/CommandPalette';
+import { GlobalSearch } from './components/GlobalSearch';
+import { StatusBar } from './components/StatusBar';
 import { Logo } from './components/Logo';
 import { Icon } from './components/Icon';
 import { getDailyNotePath, getDailyNoteTemplate, extractDailyNoteDates } from './utils/dailyNotes';
@@ -18,6 +22,9 @@ const DEFAULT_SHORTCUTS = {
   saveNote: 'Ctrl+S',
   deleteNote: 'Ctrl+Shift+Delete',
   searchNotes: 'Ctrl+F',
+  commandPalette: 'Ctrl+K',
+  quickSwitch: 'Ctrl+P',
+  vaultSearch: 'Ctrl+Shift+F',
   toggleSidebar: 'Ctrl+B',
   toggleGraph: 'Ctrl+G',
   toggleCalendar: 'Ctrl+Shift+C',
@@ -44,6 +51,9 @@ const SHORTCUT_LABEL_KEYS: Record<string, string> = {
   saveNote: 'settingsShortcutActionSaveNote',
   deleteNote: 'settingsShortcutActionDeleteNote',
   searchNotes: 'settingsShortcutActionSearchNotes',
+  commandPalette: 'settingsShortcutActionCommandPalette',
+  quickSwitch: 'settingsShortcutActionQuickSwitch',
+  vaultSearch: 'settingsShortcutActionVaultSearch',
   toggleSidebar: 'settingsShortcutActionToggleSidebar',
   toggleGraph: 'settingsShortcutActionToggleGraph',
   toggleCalendar: 'settingsShortcutActionToggleCalendar',
@@ -66,10 +76,26 @@ function App() {
   const [newNoteName, setNewNoteName] = useState('');
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+  const [theme, setTheme] = useState<'dark' | 'light' | 'system'>(() => {
     const saved = localStorage.getItem('theme');
-    return (saved === 'dark' || saved === 'light') ? saved as 'dark' | 'light' : 'dark';
+    return (saved === 'dark' || saved === 'light' || saved === 'system') ? saved as 'dark' | 'light' | 'system' : 'dark';
   });
+  // 'system' seçiliyken OS tercihini takip eder (canlı güncellenir).
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true);
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!mq) return;
+    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  const effectiveTheme = theme === 'system' ? (systemDark ? 'dark' : 'light') : theme;
+  const toggleTheme = useCallback(() => {
+    setTheme((cur) => {
+      const eff = cur === 'system' ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? true ? 'dark' : 'light') : cur;
+      return eff === 'dark' ? 'light' : 'dark';
+    });
+  }, []);
   const [transparentBg, setTransparentBg] = useState(() => localStorage.getItem('transparentBg') === 'true');
   const [windowOpacity, setWindowOpacity] = useState(() => {
     const val = localStorage.getItem('windowOpacity');
@@ -106,6 +132,27 @@ function App() {
   const [editingShortcut, setEditingShortcut] = useState<string | null>(null);
   const [recordedKeys, setRecordedKeys] = useState<string[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  // 0.3.0: komut paleti + favoriler + son açılanlar + durum çubuğu
+  const [showPalette, setShowPalette] = useState(false);
+  const [paletteQuery, setPaletteQuery] = useState('');
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
+  const [openTabs, setOpenTabs] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('openTabs') || '[]'); }
+    catch { return []; }
+  });
+  const [dirtyFiles, setDirtyFiles] = useState<Record<string, boolean>>({});
+  // Dışarıdan içerik değişimi sayacı (vault geneli değiştirme): Editor
+  // bekleyen otomatik kaydı iptal edip geçmişi sıfırlar.
+  const [contentRev, setContentRev] = useState(0);
+  const [backlinksCount, setBacklinksCount] = useState(0);
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('favorites') || '[]'); }
+    catch { return []; }
+  });
+  const [recentFiles, setRecentFiles] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('recentFiles') || '[]'); }
+    catch { return []; }
+  });
 
   const contentRef = useRef(content);
   contentRef.current = content;
@@ -133,6 +180,9 @@ function App() {
       try { setFolders(await getAllFolders()); } catch { setFolders([]); }
       setActiveFile(null);
       setContent('');
+      setOpenTabs([]);
+      setDirtyFiles({});
+      localStorage.removeItem('openTabs');
     } catch (err) {
       console.error('Failed to load vault:', err);
       alert('Failed to load vault: ' + err);
@@ -192,17 +242,133 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isRecording]);
 
+  // Sekmeler: her açılan not listede tutulur (Obsidian tarzı).
+  // Silinen notlar listeden düşer; ağaç güncellenince de temizlenir.
+  useEffect(() => {
+    setOpenTabs((prev) => {
+      const kept = prev.filter((f) => files.includes(f));
+      return kept.length === prev.length ? prev : kept;
+    });
+  }, [files]);
+
+  // Oturum başında sekmeleri geri yükle: son sekmeyi aç (bir kez).
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current || files.length === 0 || activeFile) return;
+    const last = openTabs.filter((f) => files.includes(f)).pop();
+    if (!last) { restoredRef.current = true; return; }
+    restoredRef.current = true;
+    readFile(last).then((text) => { setActiveFile(last); setContent(text); }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [files, activeFile]);
+
+  const openInTab = useCallback((file: string) => {
+    setOpenTabs((prev) => {
+      if (prev.includes(file)) return prev;
+      const next = [...prev, file];
+      localStorage.setItem('openTabs', JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const closeTab = useCallback(async (file: string) => {
+    const isActive = file === activeFile;
+    const idx = openTabs.indexOf(file);
+    setOpenTabs((prev) => {
+      const next = prev.filter((f) => f !== file);
+      localStorage.setItem('openTabs', JSON.stringify(next));
+      return next;
+    });
+    if (!isActive) return;
+    const neighbor = idx >= 0 ? (openTabs[idx - 1] ?? openTabs[idx + 1]) : undefined;
+    if (neighbor) {
+      try {
+        const text = await readFile(neighbor);
+        setActiveFile(neighbor);
+        setContent(text);
+      } catch { setActiveFile(null); setContent(''); }
+    } else {
+      setActiveFile(null);
+      setContent('');
+    }
+  }, [activeFile, openTabs]);
+
+  const cycleTab = useCallback((dir: 1 | -1) => {
+    if (openTabs.length === 0) return;
+    const idx = activeFile ? openTabs.indexOf(activeFile) : -1;
+    const next = openTabs[((idx + dir) % openTabs.length + openTabs.length) % openTabs.length];
+    if (next && next !== activeFile) {
+      readFile(next).then((text) => { setActiveFile(next); setContent(text); }).catch(() => {});
+    }
+  }, [openTabs, activeFile]);
+
+  const handleDirtyChange = useCallback((file: string, dirty: boolean) => {
+    setDirtyFiles((prev) => (dirty ? { ...prev, [file]: true } : (() => {
+      const next = { ...prev };
+      delete next[file];
+      return next;
+    })()));
+  }, []);
+
   const loadFile = useCallback(async (file: string) => {
-    if (activeFile === file) { setActiveFile(null); setContent(''); return; }
+    if (activeFile === file) { setActiveFile(null); setContent(''); setOpenTabs((p) => p.filter((f) => f !== file)); return; }
     try {
       const fileContent = await readFile(file);
       setActiveFile(file);
       setContent(fileContent);
+      openInTab(file);
+      setRecentFiles((prev) => {
+        const updated = [file, ...prev.filter((f) => f !== file)].slice(0, 10);
+        localStorage.setItem('recentFiles', JSON.stringify(updated));
+        return updated;
+      });
     } catch (err) { console.error('Failed to load file:', err); }
-  }, [activeFile]);
+  }, [activeFile, openInTab]);
 
-  const handleNewFile = useCallback(async (name: string) => {
-    if (!name.trim()) return;
+  const toggleFavorite = useCallback((file: string) => {
+    setFavorites((prev) => {
+      const updated = prev.includes(file) ? prev.filter((f) => f !== file) : [...prev, file];
+      localStorage.setItem('favorites', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const openPalette = useCallback((query = '') => { setPaletteQuery(query); setShowPalette(true); }, []);
+  const handleTagClick = useCallback((tag: string) => openPalette(`#${tag}`), [openPalette]);
+
+  useEffect(() => {
+    if (!activeFile) { setBacklinksCount(0); return; }
+    let cancelled = false;
+    getBacklinks(activeFile).then((list) => { if (!cancelled) setBacklinksCount(list.length); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [activeFile, files]);
+
+  // Ad doğrulama: oluşturmadan ÖNCE klasör/not çakışması ve geçersiz ad yakalanır.
+  const validateFolderName = useCallback((raw: string): string | null => {
+    const name = raw.trim().replace(/^\/+|\/+$/g, '');
+    if (!name) return null; // boşken buton zaten kapalı
+    const segs = name.split('/');
+    if (segs.some((s) => s === '' || s === '.' || s === '..')) return t('invalidName');
+    if (/[<>:"|?*\x00-\x1F]/.test(name)) return t('invalidName');
+    if (folders.some((f) => f.toLowerCase() === name.toLowerCase())) return t('alreadyExists', { name });
+    return null;
+  }, [folders, t]);
+
+  const validateNoteName = useCallback((raw: string): string | null => {
+    const name = raw.trim();
+    if (!name) return null;
+    if (name.split('/').some((s) => s === '' || s === '.' || s === '..')) return t('invalidName');
+    if (/[<>:"|?*\x00-\x1F]/.test(name)) return t('invalidName');
+    const fileName = name.endsWith('.md') ? name : `${name}.md`;
+    if (files.some((f) => f.toLowerCase() === fileName.toLowerCase())) return t('alreadyExists', { name });
+    return null;
+  }, [files, t]);
+
+  const [newNoteError, setNewNoteError] = useState('');
+  const [newFolderError, setNewFolderError] = useState('');
+
+  const handleNewFile = useCallback(async (name: string): Promise<string | null> => {
+    if (!name.trim()) return null;
     try {
       const fileName = name.trim().endsWith('.md') ? name.trim() : `${name.trim()}.md`;
       await createFile(fileName);
@@ -210,18 +376,20 @@ function App() {
       try { setFolders(await getAllFolders()); } catch { /* ignore */ }
       setSidebarResetKey(k => k + 1);
       loadFile(fileName);
-    } catch (err) { console.error('Failed to create file:', err); alert(String(err)); }
+      return null;
+    } catch (err) { console.error('Failed to create file:', err); return String(err); }
   }, [loadFile]);
 
-  const handleNewFolder = useCallback(async (name: string) => {
-    if (!name.trim()) return;
+  const handleNewFolder = useCallback(async (name: string): Promise<string | null> => {
+    if (!name.trim()) return null;
     try {
       const folder = name.trim().replace(/^\/+|\/+$/g, '');
       await createFolder(folder);
       setFiles(await getAllFiles());
       try { setFolders(await getAllFolders()); } catch { /* ignore */ }
       setSidebarResetKey(k => k + 1);
-    } catch (err) { console.error('Failed to create folder:', err); alert(String(err)); }
+      return null;
+    } catch (err) { console.error('Failed to create folder:', err); return String(err); }
   }, []);
 
   const handleDeleteFile = useCallback(async (fileName: string) => {
@@ -229,6 +397,8 @@ function App() {
       await deleteFile(fileName);
       setFiles(await getAllFiles());
       try { setFolders(await getAllFolders()); } catch { /* ignore */ }
+      setOpenTabs((prev) => prev.filter((f) => f !== fileName));
+      setDirtyFiles((prev) => { const n = { ...prev }; delete n[fileName]; return n; });
       if (activeFile === fileName) { setActiveFile(null); setContent(''); }
     } catch (err) { console.error('Failed to delete file:', err); }
   }, [activeFile]);
@@ -236,6 +406,9 @@ function App() {
   // Arama isabetine atlama: dosyayı açıp imleci isabetin üstüne koyar.
   const [pendingSelect, setPendingSelect] = useState<{ file: string; start: number; end: number } | null>(null);
   const consumePendingSelect = useCallback(() => setPendingSelect(null), []);
+  const handleHeadingJump = useCallback((offset: number) => {
+    if (activeFile) setPendingSelect({ file: activeFile, start: offset, end: offset });
+  }, [activeFile]);
   const handleFileHit = useCallback(async (file: string, start: number, end: number) => {
     if (file !== activeFile) {
       try {
@@ -243,12 +416,85 @@ function App() {
         setActiveFile(file);
         setContent(fileContent);
         setShowEditor(true);
+        openInTab(file);
         setPendingSelect({ file, start, end });
       } catch (err) { console.error('Failed to open file:', err); }
     } else {
       setPendingSelect({ file, start, end });
     }
+  }, [activeFile, openInTab]);
+
+  // Vault geneli değiştirme: taze metne uygula, diske yaz, editör bekleyen kaydını iptal etsin.
+  const handleVaultReplace = useCallback(async (file: string, matches: TextMatch[], replacement: string) => {
+    const apply = (text: string) => {
+      const sorted = [...matches].sort((a, b) => a.start - b.start);
+      let next = '';
+      let last = 0;
+      for (const m of sorted) {
+        const s = Math.max(0, Math.min(m.start, text.length));
+        const e = Math.max(s, Math.min(m.end, text.length));
+        if (s < last) continue;
+        next += text.slice(last, s) + replacement;
+        last = e;
+      }
+      return next + text.slice(last);
+    };
+    try {
+      if (file === activeFile) {
+        const next = apply(contentRef.current);
+        setContent(next);
+        await writeFile(file, next);
+        setContentRev((v) => v + 1);
+      } else {
+        const text = await readFile(file);
+        await writeFile(file, apply(text));
+      }
+    } catch (err) { console.error('Failed to replace in file:', err); }
   }, [activeFile]);
+
+  // Klasör silme: içindeki notlar da gider; sekmeler, favoriler ve
+  // günlük not klasörü temizlenir.
+  const handleDeleteFolder = useCallback(async (folder: string) => {
+    const inside = files.filter((f) => f === folder || f.startsWith(`${folder}/`));
+    const extraFolders = folders.filter((f) => f === folder || f.startsWith(`${folder}/`)).length;
+    const count = inside.length;
+    const ok = await confirmDialog(
+      count > 0
+        ? t('deleteFolderConfirm', { name: folder, count: String(count) })
+        : t('deleteEmptyFolderConfirm', { name: folder })
+    );
+    if (!ok) return;
+    try {
+      // Aktif not silinecekse önce içeriği diske yaz (yoksa kaydedilmemiş yazı kaybolur)
+      if (activeFile && (activeFile === folder || activeFile.startsWith(`${folder}/`))) {
+        try { await writeFile(activeFile, contentRef.current); } catch { /* ignore */ }
+      }
+      await deleteFolder(folder);
+      const nextFiles = await getAllFiles();
+      setFiles(nextFiles);
+      try { setFolders(await getAllFolders()); } catch { /* ignore */ }
+      setOpenTabs((prev) => prev.filter((f) => !(f === folder || f.startsWith(`${folder}/`))));
+      setFavorites((prev) => {
+        const next = prev.filter((f) => !(f === folder || f.startsWith(`${folder}/`)));
+        localStorage.setItem('favorites', JSON.stringify(next));
+        return next;
+      });
+      setRecentFiles((prev) => {
+        const next = prev.filter((f) => !(f === folder || f.startsWith(`${folder}/`)));
+        localStorage.setItem('recentFiles', JSON.stringify(next));
+        return next;
+      });
+      if (activeFile && (activeFile === folder || activeFile.startsWith(`${folder}/`))) {
+        setActiveFile(null);
+        setContent('');
+      }
+      if (dailyNotesFolder === folder || dailyNotesFolder === `${folder}/` || dailyNotesFolder.startsWith(`${folder}/`)) {
+        setDailyNotesFolder('Daily/');
+        localStorage.setItem('dailyNotesFolder', 'Daily/');
+      }
+      if (extraFolders > 0) setSidebarResetKey((k) => k + 1);
+    } catch (err) { console.error('Failed to delete folder:', err); }
+  }, [files, folders, activeFile, dailyNotesFolder, t]);
 
   const handleRenameFile = useCallback(async (oldName: string, newName: string) => {
     if (oldName === newName) return;
@@ -267,6 +513,14 @@ function App() {
       setFiles(await getAllFiles());
       try { setFolders(await getAllFolders()); } catch { /* ignore */ }
       if (activeFile === oldName) setActiveFile(newName);
+      setOpenTabs((prev) => prev.map((f) => (f === oldName ? newName : f)));
+      setDirtyFiles((prev) => {
+        if (!prev[oldName]) return prev;
+        const n = { ...prev };
+        n[newName] = true;
+        delete n[oldName];
+        return n;
+      });
     } catch (err) { console.error('Failed to rename file:', err); alert(String(err)); }
   }, [files, activeFile, t]);
 
@@ -277,14 +531,23 @@ function App() {
     }
   }, [vaultPath]);
 
+  // [[Not]] → gerçek dosya (ad veya yol, büyük/küçük harf duyarsız)
+  const resolveLinkFile = useCallback((link: string) =>
+    files.find((f) => f.toLowerCase().replace(/\.md$/, '') === link.toLowerCase())
+    ?? files.find((f) => (f.split('/').pop() || '').toLowerCase().replace(/\.md$/, '') === link.toLowerCase())
+    ?? null, [files]);
+
   const handleLinkClick = useCallback((link: string) => {
-    const targetFile = files.find(f => f.toLowerCase().replace(/\.md$/, '') === link.toLowerCase());
-    if (targetFile) loadFile(targetFile);
-    else {
+    const targetFile = resolveLinkFile(link);
+    if (targetFile) {
+      // Kendine bağlantı: notu kapatma, sadece odaklan (Obsidian davranışı).
+      if (targetFile === activeFile) { setShowEditor(true); return; }
+      loadFile(targetFile);
+    } else {
       const newFileName = `${link}.md`;
       createFile(newFileName).then(() => handleRefresh()).then(() => loadFile(newFileName)).catch(console.error);
     }
-  }, [files, loadFile, handleRefresh]);
+  }, [resolveLinkFile, loadFile, handleRefresh, activeFile]);
 
   const handleOpenVaultDialog = useCallback(async () => {
     try {
@@ -305,17 +568,27 @@ function App() {
     setVaultDialogPath(vaultPath || DEFAULT_VAULT_PATH);
   }, [vaultPath]);
 
-  const handleNewNoteConfirm = useCallback(() => {
-    if (newNoteName.trim()) { handleNewFile(newNoteName); setNewNoteName(''); setShowNewNoteModal(false); }
-  }, [newNoteName, handleNewFile]);
+  const handleNewNoteConfirm = useCallback(async () => {
+    if (!newNoteName.trim()) return;
+    const live = validateNoteName(newNoteName);
+    if (live) { setNewNoteError(live); return; }
+    const err = await handleNewFile(newNoteName);
+    if (err) setNewNoteError(err);
+    else { setNewNoteName(''); setNewNoteError(''); setShowNewNoteModal(false); }
+  }, [newNoteName, handleNewFile, validateNoteName]);
 
-  const handleNewNoteCancel = useCallback(() => { setNewNoteName(''); setShowNewNoteModal(false); }, []);
-  const handleOpenNewNoteModal = useCallback(() => setShowNewNoteModal(true), []);
-  const handleNewFolderConfirm = useCallback(() => {
-    if (newFolderName.trim()) { handleNewFolder(newFolderName); setNewFolderName(''); setShowNewFolderModal(false); }
-  }, [newFolderName, handleNewFolder]);
-  const handleNewFolderCancel = useCallback(() => { setNewFolderName(''); setShowNewFolderModal(false); }, []);
-  const handleOpenNewFolderModal = useCallback(() => setShowNewFolderModal(true), []);
+  const handleNewNoteCancel = useCallback(() => { setNewNoteName(''); setNewNoteError(''); setShowNewNoteModal(false); }, []);
+  const handleOpenNewNoteModal = useCallback(() => { setNewNoteError(''); setShowNewNoteModal(true); }, []);
+  const handleNewFolderConfirm = useCallback(async () => {
+    if (!newFolderName.trim()) return;
+    const live = validateFolderName(newFolderName);
+    if (live) { setNewFolderError(live); return; }
+    const err = await handleNewFolder(newFolderName);
+    if (err) setNewFolderError(err);
+    else { setNewFolderName(''); setNewFolderError(''); setShowNewFolderModal(false); }
+  }, [newFolderName, handleNewFolder, validateFolderName]);
+  const handleNewFolderCancel = useCallback(() => { setNewFolderName(''); setNewFolderError(''); setShowNewFolderModal(false); }, []);
+  const handleOpenNewFolderModal = useCallback(() => { setNewFolderError(''); setShowNewFolderModal(true); }, []);
 
   const handleSetOpacity = useCallback((opacity: number) => {
     const clamped = Math.max(0.6, Math.min(1, opacity));
@@ -408,14 +681,21 @@ function App() {
       if (match('saveNote')) { e.preventDefault(); void handleSaveNow(); return; }
       if (match('deleteNote')) { e.preventDefault(); void handleDeleteActive(); return; }
       if (match('searchNotes')) { e.preventDefault(); openSearch(); return; }
+      if (match('vaultSearch')) { e.preventDefault(); setShowGlobalSearch(true); return; }
+      if (match('commandPalette') || match('quickSwitch')) { e.preventDefault(); openPalette(); return; }
       if (match('toggleSidebar')) { e.preventDefault(); setShowSidebar(s => !s); return; }
       if (match('toggleGraph')) { e.preventDefault(); setShowGraphModal(s => !s); return; }
       if (match('toggleCalendar')) { e.preventDefault(); toggleCalendar(); return; }
       if ((e.ctrlKey || e.metaKey) && e.key === ',') { e.preventDefault(); setShowSettings(true); return; }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'b') { e.preventDefault(); setShowBacklinks(s => !s); return; }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'd') { e.preventDefault(); void handleOpenDailyNote(new Date()); return; }
+      // Sekmeler: Ctrl+W kapatır, Ctrl+Tab / Ctrl+Shift+Tab gezinir
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'w') { e.preventDefault(); if (activeFile) void closeTab(activeFile); return; }
+      if (e.ctrlKey && e.key === 'Tab') { e.preventDefault(); cycleTab(e.shiftKey ? -1 : 1); return; }
       if (e.key === 'Escape') {
-        if (showSearchBar) setShowSearchBar(false);
+        if (showGlobalSearch) setShowGlobalSearch(false);
+        else if (showPalette) setShowPalette(false);
+        else if (showSearchBar) setShowSearchBar(false);
         else if (showNewNoteModal) { setShowNewNoteModal(false); setNewNoteName(''); }
         else if (showVaultDialog) handleVaultDialogCancel();
         else if (showSettings) setShowSettings(false);
@@ -425,8 +705,8 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    shortcuts, showNewNoteModal, showVaultDialog, showSettings, showGraphModal, showSearchBar,
-    handleSaveNow, handleDeleteActive, openSearch, toggleCalendar,
+    shortcuts, showNewNoteModal, showVaultDialog, showSettings, showGraphModal, showSearchBar, showPalette, showGlobalSearch,
+    handleSaveNow, handleDeleteActive, openSearch, toggleCalendar, openPalette, activeFile, closeTab, cycleTab,
     handleVaultDialogCancel, handleOpenDailyNote,
   ]);
 
@@ -441,9 +721,9 @@ function App() {
   }, [transparentBg, windowOpacity]);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-theme', effectiveTheme);
     localStorage.setItem('theme', theme);
-  }, [theme]);
+  }, [theme, effectiveTheme]);
   useEffect(() => { localStorage.setItem('wordWrap', String(wordWrap)); }, [wordWrap]);
   useEffect(() => { localStorage.setItem('editorFontSize', String(editorFontSize)); }, [editorFontSize]);
 
@@ -453,6 +733,20 @@ function App() {
   }, [lang]);
 
   useEffect(() => { localStorage.setItem('showEditor', String(showEditor)); }, [showEditor]);
+
+  const paletteCommands: PaletteCommand[] = useMemo(() => [
+    { id: 'new-note', label: t('newNoteTitle'), hint: shortcuts.newNote, icon: 'plus', run: () => setShowNewNoteModal(true) },
+    { id: 'daily', label: t('dailyNote'), hint: 'Ctrl+Shift+D', icon: 'calendar', run: () => void handleOpenDailyNote(new Date()) },
+    { id: 'palette-search', label: t('searchVault'), hint: shortcuts.searchNotes, icon: 'search', run: () => openSearch() },
+    { id: 'vault-search', label: t('globalSearch'), hint: shortcuts.vaultSearch, icon: 'search', run: () => setShowGlobalSearch(true) },
+    { id: 'graph', label: t('graphView'), hint: shortcuts.toggleGraph, icon: 'graph', run: () => setShowGraphModal(true) },
+    { id: 'sidebar', label: t('toggleSidebar'), hint: shortcuts.toggleSidebar, icon: 'menu', run: () => setShowSidebar((s) => !s) },
+    { id: 'backlinks', label: t('toggleBacklinks'), icon: 'pen', run: () => setShowBacklinks((s) => !s) },
+    { id: 'calendar', label: t('showCalendar'), hint: shortcuts.toggleCalendar, icon: 'calendar', run: () => toggleCalendar() },
+    { id: 'theme', label: `${t('settingsTheme')}: ${effectiveTheme === 'dark' ? t('settingsLight') : t('settingsDark')}`, icon: effectiveTheme === 'dark' ? 'sun' : 'moon', run: () => toggleTheme() },
+    { id: 'wrap', label: `${t('settingsWordWrap')}: ${wordWrap ? t('off') : t('on')}`, icon: 'list', run: () => setWordWrap((w) => !w) },
+    { id: 'settings', label: t('settings'), hint: 'Ctrl+,', icon: 'settings', run: () => setShowSettings(true) },
+  ], [t, shortcuts, handleOpenDailyNote, openSearch, toggleCalendar, effectiveTheme, toggleTheme, theme, wordWrap]);
 
   return (
     <div className="app">
@@ -466,21 +760,30 @@ function App() {
           {appVersion && <span className="version-badge">v{appVersion}</span>}
         </div>
         <div className="toolbar-right">
-          <button className="btn icon-only" onClick={handleOpenNewNoteModal} disabled={!vaultPath} aria-label={t('newNote')} title={t('newNote')}>
+          <button className="btn icon-only palette-trigger" data-priority="1" onClick={() => openPalette()} aria-label={t('commandPalette')} title={t('commandPalette')}>
+            <Icon name="command" />
+          </button>
+          <button className="btn icon-only" data-priority="3" onClick={() => void handleOpenDailyNote(new Date())} disabled={!vaultPath} aria-label={t('dailyNote')} title={t('dailyNote')}>
+            <Icon name="calendar" />
+          </button>
+          <button className="btn icon-only" data-priority="1" onClick={handleOpenNewNoteModal} disabled={!vaultPath} aria-label={t('newNote')} title={t('newNote')}>
             <Icon name="plus" />
           </button>
-          <button className="btn icon-only" onClick={handleRefresh} disabled={!vaultPath || loading} aria-label={t('refresh')} title={t('refresh')}>
+          <button className="btn icon-only" data-priority="2" onClick={handleRefresh} disabled={!vaultPath || loading} aria-label={t('refresh')} title={t('refresh')}>
             <Icon name="refresh" />
           </button>
-          <div className="toolbar-divider" />
-          <button className="btn icon-only" onClick={() => setShowBacklinks(!showBacklinks)} aria-pressed={showBacklinks} aria-label={t('toggleBacklinks')} title={t('toggleBacklinks')}>
+          <div className="toolbar-divider" data-div-priority="2" />
+          <button className="btn icon-only" data-priority="2" onClick={() => setShowBacklinks(!showBacklinks)} aria-pressed={showBacklinks} aria-label={t('toggleBacklinks')} title={t('toggleBacklinks')}>
             <Icon name="pen" />
           </button>
-          <div className="toolbar-divider" />
-          <button className="btn icon-only" onClick={handleOpenGraphModal} aria-label={t('graphView')} title={t('graphView')}>
+          <div className="toolbar-divider" data-div-priority="3" />
+          <button className="btn icon-only" data-priority="2" onClick={handleOpenGraphModal} aria-label={t('graphView')} title={t('graphView')}>
             <Icon name="graph" />
           </button>
-          <button className="btn icon-only" onClick={() => setShowSettings(true)} aria-label={t('settings')} title={t('settings')}>
+          <button className="btn icon-only" data-priority="3" onClick={toggleTheme} aria-label={t('settingsTheme')} title={`${t('settingsTheme')}: ${effectiveTheme === 'dark' ? t('settingsLight') : t('settingsDark')}`}>
+            <Icon name={effectiveTheme === 'dark' ? 'sun' : 'moon'} />
+          </button>
+          <button className="btn icon-only" data-priority="1" onClick={() => setShowSettings(true)} aria-label={t('settings')} title={t('settings')}>
             <Icon name="settings" />
           </button>
         </div>
@@ -489,7 +792,10 @@ function App() {
         {showSidebar && (
           <>
             <Sidebar
-              files={files} folders={folders} resetKey={sidebarResetKey} activeFile={activeFile} activeFileContent={content} onFileSelect={loadFile} onDeleteFile={handleDeleteFile}
+              files={files} folders={folders} resetKey={sidebarResetKey} activeFile={activeFile} activeFileContent={content}
+              favorites={favorites} recentFiles={recentFiles} onToggleFavorite={toggleFavorite}
+              onDeleteFolder={handleDeleteFolder}
+              onFileSelect={loadFile} onDeleteFile={handleDeleteFile}
               onFileHit={handleFileHit} onRenameFile={handleRenameFile}
               onNewNote={handleOpenNewNoteModal} onNewFolder={handleOpenNewFolderModal} currentCalendarMonth={currentCalendarMonth}
               onCalendarMonthChange={setCurrentCalendarMonth} onOpenDailyNote={handleOpenDailyNote}
@@ -514,15 +820,50 @@ function App() {
           </>
         )}
         <div className="main-content" style={{ flex: 1, display: 'flex', flexDirection: 'row' }}>
-          <Editor
+          <div className="editor-column">
+            {openTabs.length > 0 && (
+              <div className="tabbar" role="tablist" aria-label={t('openTabs')}>
+                {openTabs.map((f) => (
+                  <div
+                    key={f}
+                    role="tab"
+                    aria-selected={f === activeFile}
+                    tabIndex={0}
+                    className={`tab${f === activeFile ? ' active' : ''}`}
+                    title={f}
+                    onClick={() => { if (f !== activeFile) loadFile(f); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && f !== activeFile) loadFile(f); }}
+                    onAuxClick={(e) => { if (e.button === 1) void closeTab(f); }}
+                  >
+                    {dirtyFiles[f] && <span className="tab-dirty" aria-hidden="true" />}
+                    <span className="tab-title">{f.replace(/\.md$/, '').split('/').pop()}</span>
+                    <button
+                      className="tab-close"
+                      onClick={(e) => { e.stopPropagation(); void closeTab(f); }}
+                      aria-label={t('closeTab')}
+                      title={t('closeTab')}
+                    >
+                      <Icon name="x" size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Editor
             fileName={activeFile} content={content} onContentChange={setContent} onLinkClick={handleLinkClick}
+            onTagClick={handleTagClick} isFavorite={activeFile ? favorites.includes(activeFile) : false}
+            onToggleFavorite={activeFile ? () => toggleFavorite(activeFile) : undefined}
+            contentRevision={contentRev}
             onDeleteFile={handleDeleteFile} onOpenVault={() => setShowVaultDialog(true)}
             showEditor={showEditor} setShowEditor={setShowEditor}
             showSearchBar={showSearchBar} setShowSearchBar={setShowSearchBar}
             pendingSelect={pendingSelect} onPendingSelectConsumed={consumePendingSelect}
             wordWrap={wordWrap} fontSize={editorFontSize} onFontSizeChange={setEditorFontSize}
+            resolveLink={resolveLinkFile}
+            onDirtyChange={handleDirtyChange}
             t={t}
-          />
+            />
+          </div>
         </div>
         {showBacklinks && (
           <>
@@ -543,10 +884,35 @@ function App() {
               }}
               aria-label="Resize backlinks pane" role="separator"
             />
-            <BacklinksPane currentFile={activeFile} onFileSelect={loadFile} t={t} />
+            <BacklinksPane currentFile={activeFile} content={content} files={files} onFileSelect={loadFile} onFileHit={handleFileHit} onHeadingClick={handleHeadingJump} onTagClick={handleTagClick} t={t} />
           </>
         )}
       </div>
+      <StatusBar activeFile={activeFile} content={content} filesCount={files.length} backlinksCount={backlinksCount} t={t} />
+
+      <CommandPalette
+        isOpen={showPalette}
+        initialQuery={paletteQuery}
+        files={files}
+        activeFile={activeFile}
+        favorites={favorites}
+        recentFiles={recentFiles}
+        commands={paletteCommands}
+        onOpenFile={loadFile}
+        onClose={() => setShowPalette(false)}
+        t={t}
+      />
+
+      <GlobalSearch
+        isOpen={showGlobalSearch}
+        files={files}
+        activeFile={activeFile}
+        activeFileContent={content}
+        onFileHit={handleFileHit}
+        onReplaceFile={handleVaultReplace}
+        onClose={() => setShowGlobalSearch(false)}
+        t={t}
+      />
 
       {showVaultDialog && (
         <div className="modal-overlay" onClick={handleVaultDialogCancel} role="dialog" aria-modal="true" aria-labelledby="vault-dialog-title">
@@ -586,15 +952,18 @@ function App() {
               <div className="modal-path-input">
                 <label htmlFor="newnote-name-input" className="modal-label">{t('noteName')}</label>
                 <input id="newnote-name-input" type="text" value={newNoteName}
-                  onChange={(e) => setNewNoteName(e.target.value)} placeholder={t('noteNamePlaceholder')}
+                  onChange={(e) => { setNewNoteName(e.target.value); setNewNoteError(''); }} placeholder={t('noteNamePlaceholder')}
                   className="modal-input" autoFocus
                   onKeyDown={(e) => { if (e.key === 'Enter') handleNewNoteConfirm(); if (e.key === 'Escape') handleNewNoteCancel(); }} />
+                {(newNoteError || validateNoteName(newNoteName)) && newNoteName.trim() && (
+                  <p className="modal-error" role="alert">{newNoteError || validateNoteName(newNoteName)}</p>
+                )}
                 <p className="modal-hint" style={{ fontSize: '12px', color: 'var(--fg-muted)', marginTop: '6px' }}>Subfolders with <code style={{ background: 'var(--bg-tertiary)', padding: '1px 5px', borderRadius: '3px' }}>/</code> — e.g. <code>Projects/My Note</code></p>
               </div>
             </div>
             <footer className="modal-footer">
               <button className="btn secondary" onClick={handleNewNoteCancel}>{t('cancel')}</button>
-              <button className="btn primary" onClick={handleNewNoteConfirm} disabled={!newNoteName.trim()}>{t('create')}</button>
+              <button className="btn primary" onClick={handleNewNoteConfirm} disabled={!newNoteName.trim() || !!validateNoteName(newNoteName)}>{t('create')}</button>
             </footer>
           </div>
         </div>
@@ -611,14 +980,17 @@ function App() {
               <div className="modal-path-input">
                 <label htmlFor="newfolder-name-input" className="modal-label">{t('folderName')}</label>
                 <input id="newfolder-name-input" type="text" value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)} placeholder={t('folderNamePlaceholder')}
+                  onChange={(e) => { setNewFolderName(e.target.value); setNewFolderError(''); }} placeholder={t('folderNamePlaceholder')}
                   className="modal-input" autoFocus
                   onKeyDown={(e) => { if (e.key === 'Enter') handleNewFolderConfirm(); if (e.key === 'Escape') handleNewFolderCancel(); }} />
+                {(newFolderError || validateFolderName(newFolderName)) && newFolderName.trim() && (
+                  <p className="modal-error" role="alert">{newFolderError || validateFolderName(newFolderName)}</p>
+                )}
               </div>
             </div>
             <footer className="modal-footer">
               <button className="btn secondary" onClick={handleNewFolderCancel}>{t('cancel')}</button>
-              <button className="btn primary" onClick={handleNewFolderConfirm} disabled={!newFolderName.trim()}>{t('createFolder')}</button>
+              <button className="btn primary" onClick={handleNewFolderConfirm} disabled={!newFolderName.trim() || !!validateFolderName(newFolderName)}>{t('createFolder')}</button>
             </footer>
           </div>
         </div>
@@ -648,7 +1020,8 @@ function App() {
                   </div>
                   <div className="settings-row">
                     <label htmlFor="theme">{t('settingsTheme')}</label>
-                    <select id="theme" className="modal-input" value={theme} onChange={(e) => setTheme(e.target.value as 'dark' | 'light')}>
+                    <select id="theme" className="modal-input" value={theme} onChange={(e) => setTheme(e.target.value as 'dark' | 'light' | 'system')}>
+                      <option value="system">{t('settingsSystem')}</option>
                       <option value="light">{t('settingsLight')}</option>
                       <option value="dark">{t('settingsDark')}</option>
                     </select>

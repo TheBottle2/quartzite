@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from './Icon';
-import { findFoldedMatches } from '../utils/search';
+import { findTextMatches } from '../utils/search';
 import type { TFunc } from '../i18n';
 
 export interface SearchMatch { start: number; end: number; }
@@ -30,26 +30,9 @@ export function SearchBar({ content, onClose, onSelect, onReplaceCurrent, onRepl
 
   useEffect(() => { inputRef.current?.focus(); inputRef.current?.select(); }, []);
 
-  const matches = useMemo<SearchMatch[]>(() => {
-    if (!query) return [];
-    // Düz metin + duyarsız: katlamalı arama (Türkçe-İ güvenli, indisler orijinal metne ait).
-    if (!useRegex && !wholeWord && !caseSensitive) return findFoldedMatches(content, query);
-    try {
-      const escaped = useRegex ? query : query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const pattern = wholeWord ? `\\b(?:${escaped})\\b` : escaped;
-      const re = new RegExp(pattern, caseSensitive ? 'g' : 'gi');
-      const out: SearchMatch[] = [];
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(content)) !== null) {
-        out.push({ start: m.index, end: m.index + m[0].length });
-        if (m[0].length === 0) re.lastIndex++;
-        if (out.length > 5000) break;
-      }
-      return out;
-    } catch {
-      return [];
-    }
-  }, [content, query, caseSensitive, useRegex, wholeWord]);
+  const matches = useMemo<SearchMatch[]>(() =>
+    findTextMatches(content, query, { caseSensitive, useRegex, wholeWord }),
+    [content, query, caseSensitive, useRegex, wholeWord]);
 
   useEffect(() => {
     if (current >= matches.length) setCurrent(Math.max(0, matches.length - 1));
