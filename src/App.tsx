@@ -589,6 +589,12 @@ function App() {
   }, [newFolderName, handleNewFolder, validateFolderName]);
   const handleNewFolderCancel = useCallback(() => { setNewFolderName(''); setNewFolderError(''); setShowNewFolderModal(false); }, []);
   const handleOpenNewFolderModal = useCallback(() => { setNewFolderError(''); setShowNewFolderModal(true); }, []);
+  // Klasör menüsünden "Klasöre yeni not": ad önceden doldurulur.
+  const handleNewNoteInFolder = useCallback((folder: string) => {
+    setNewNoteName(`${folder.replace(/^\/+|\/+$/g, '')}/`);
+    setNewNoteError('');
+    setShowNewNoteModal(true);
+  }, []);
 
   const handleSetOpacity = useCallback((opacity: number) => {
     const clamped = Math.max(0.6, Math.min(1, opacity));
@@ -794,7 +800,7 @@ function App() {
             <Sidebar
               files={files} folders={folders} resetKey={sidebarResetKey} activeFile={activeFile} activeFileContent={content}
               favorites={favorites} recentFiles={recentFiles} onToggleFavorite={toggleFavorite}
-              onDeleteFolder={handleDeleteFolder}
+              onDeleteFolder={handleDeleteFolder} onNewNoteInFolder={handleNewNoteInFolder}
               onFileSelect={loadFile} onDeleteFile={handleDeleteFile}
               onFileHit={handleFileHit} onRenameFile={handleRenameFile}
               onNewNote={handleOpenNewNoteModal} onNewFolder={handleOpenNewFolderModal} currentCalendarMonth={currentCalendarMonth}

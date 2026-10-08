@@ -16,6 +16,7 @@ interface SidebarProps {
   recentFiles: string[];
   onToggleFavorite: (file: string) => void;
   onDeleteFolder: (folder: string) => void;
+  onNewNoteInFolder: (folder: string) => void;
   onFileSelect: (file: string) => void;
   onDeleteFile: (file: string) => void;
   onFileHit: (file: string, start: number, end: number) => void;
@@ -35,7 +36,7 @@ const folderOf = (f: string) => (f.includes('/') ? f.slice(0, f.lastIndexOf('/')
 const baseOf = (f: string) => (f.includes('/') ? f.slice(f.lastIndexOf('/') + 1) : f);
 
 export function Sidebar({
-  files, folders, resetKey, activeFile, activeFileContent, favorites, recentFiles, onToggleFavorite, onDeleteFolder, onFileSelect, onDeleteFile, onFileHit, onRenameFile, onNewNote, onNewFolder,
+  files, folders, resetKey, activeFile, activeFileContent, favorites, recentFiles, onToggleFavorite, onDeleteFolder, onNewNoteInFolder, onFileSelect, onDeleteFile, onFileHit, onRenameFile, onNewNote, onNewFolder,
   currentCalendarMonth, onCalendarMonthChange, onOpenDailyNote, noteDates, t, locale, showCalendar,
 }: SidebarProps) {
   const [isCalendarCollapsed, setIsCalendarCollapsed] = useState(() => localStorage.getItem('calendarCollapsed') === 'true');
@@ -207,7 +208,7 @@ export function Sidebar({
     onRenameFile(src, dest);
   };
 
-  // ---- Sağ tık menüsü: yolu kopyala / dosya yöneticisinde aç / sil ----
+  // ---- Sağ tık menüsü: bulunduğu konumu aç / yolu kopyala / sil ----
   const [menu, setMenu] = useState<{ x: number; y: number; kind: 'file' | 'folder'; path: string } | null>(null);
   const [menuMsg, setMenuMsg] = useState('');
 
@@ -216,7 +217,7 @@ export function Sidebar({
     e.stopPropagation();
     setMenuMsg('');
     // Ekran sınırına göre konumla (menü taşmasın)
-    const w = 220, h = 120;
+    const w = 240, h = 200;
     const x = Math.min(e.clientX, window.innerWidth - w - 8);
     const y = Math.min(e.clientY, window.innerHeight - h - 8);
     setMenu({ x: Math.max(8, x), y: Math.max(8, y), kind, path });
@@ -310,8 +311,7 @@ export function Sidebar({
         {searching && hits > 0 && (
           <span className="file-hits" title={t('contentHits', { count: String(hits) })}>{hits}</span>
         )}
-        {activeFile === file && (
-          <span className="file-actions">
+        <span className="file-actions">
             <button
               className="file-action-btn"
               onClick={(e) => { e.stopPropagation(); onToggleFavorite(file); }}
@@ -330,14 +330,21 @@ export function Sidebar({
             </button>
             <button
               className="file-action-btn"
+              onClick={(e) => { e.stopPropagation(); void reveal(file); }}
+              aria-label={t('openLocation')}
+              title={t('openLocation')}
+            >
+              <Icon name="external-link" size={12} />
+            </button>
+            <button
+              className="file-action-btn"
               onClick={(e) => handleDeleteFile(e, file)}
               aria-label={t('deleteFile')}
               title={t('deleteFile')}
             >
               <Icon name="trash" size={12} />
             </button>
-          </span>
-        )}
+        </span>
       </div>
     );
   };
@@ -370,6 +377,22 @@ export function Sidebar({
             <span className="folder-icon" aria-hidden="true"><Icon name="folder" size={14} /></span>
             <span className="folder-name">{folder}</span>
             <span className="folder-count">{folderFiles.length}</span>
+          </button>
+          <button
+            className="folder-more-btn"
+            onClick={(e) => { e.stopPropagation(); void reveal(folder); }}
+            aria-label={t('openLocation')}
+            title={t('openLocation')}
+          >
+            <Icon name="external-link" size={13} />
+          </button>
+          <button
+            className="folder-more-btn danger"
+            onClick={(e) => { e.stopPropagation(); onDeleteFolder(folder); }}
+            aria-label={t('deleteFolder')}
+            title={t('deleteFolder')}
+          >
+            <Icon name="trash" size={13} />
           </button>
           <button
             className="folder-more-btn"
@@ -516,15 +539,27 @@ export function Sidebar({
           onClick={(e) => e.stopPropagation()}
         >
           <div className="ctx-menu-title" title={menu.path}>{menu.path}</div>
+          <button className="ctx-item" role="menuitem" onClick={() => void reveal(menu.path)}>
+            <Icon name="external-link" size={13} />
+            <span>{menu.kind === 'folder' ? t('openFolder') : t('openLocation')}</span>
+          </button>
           <button className="ctx-item" role="menuitem" onClick={() => void copyPath(menu.path)}>
             <Icon name="copy" size={13} />
             <span>{t('copyPath')}</span>
           </button>
-          <button className="ctx-item" role="menuitem" onClick={() => void reveal(menu.path)}>
-            <Icon name="external-link" size={13} />
-            <span>{t('revealInFileManager')}</span>
-          </button>
           <div className="ctx-sep" role="separator" />
+          {menu.kind === 'folder' && (
+            <button className="ctx-item" role="menuitem" onClick={() => { const p = menu.path; setMenu(null); onNewNoteInFolder(p); }}>
+              <Icon name="plus" size={13} />
+              <span>{t('newNoteInFolder')}</span>
+            </button>
+          )}
+          {menu.kind === 'file' && (
+            <button className="ctx-item" role="menuitem" onClick={() => { const p = menu.path; setMenu(null); startRename(p); }}>
+              <Icon name="pen" size={13} />
+              <span>{t('renameFile')}</span>
+            </button>
+          )}
           <button
             className="ctx-item danger"
             role="menuitem"

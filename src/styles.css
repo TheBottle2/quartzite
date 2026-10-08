@@ -397,6 +397,7 @@ body.transparent-bg .editor-textarea.with-search { background: transparent !impo
 }
 .folder-row-wrap:hover .folder-more-btn { opacity: 0.8; }
 .folder-more-btn:hover { background: var(--bg-hover); color: var(--fg-primary); opacity: 1 !important; }
+.folder-more-btn.danger:hover { color: var(--danger); }
 .folder-more-btn:focus-visible { opacity: 1; }
 
 /* ===== Sağ tık menüsü (klasör/dosya işlemleri) ===== */
@@ -433,13 +434,15 @@ body.transparent-bg .ctx-menu { background: rgba(var(--translucent-rgb), var(--w
   font-size: 10px; font-family: var(--font-mono); color: var(--accent);
   background: var(--accent-light); border-radius: 8px; padding: 1px 7px; flex-shrink: 0;
 }
-.file-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.file-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; opacity: 0; transition: opacity 0.12s ease; }
+.file-item:hover .file-actions, .file-item.active .file-actions, .file-item:focus-within .file-actions { opacity: 1; }
 .file-action-btn {
   background: transparent; border: none; color: var(--fg-muted); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; padding: 0; border-radius: 4px; opacity: 0.7;
 }
 .file-action-btn:hover { background: var(--bg-hover); color: var(--fg-primary); opacity: 1; }
+.file-action-btn:focus-visible { opacity: 1; outline: 2px solid var(--accent); outline-offset: -2px; }
 .file-item.renaming { cursor: default; }
 .rename-input {
   flex: 1; min-width: 0; background: var(--bg-input); border: 1px solid var(--accent);

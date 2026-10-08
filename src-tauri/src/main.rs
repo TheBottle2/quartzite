@@ -409,7 +409,8 @@ async fn absolute_path(state: State<'_, VaultState>, name: String) -> Result<Str
 }
 
 /// Hedefi işletim sisteminin dosya yöneticisinde açar.
-/// Klasör → kendisi, dosya → üst klasör (macOS/Windows'ta seçili).
+/// Klasör → kendisi, DOSYA → içinde bulunduğu klasör (dosyayı seçmez).
+/// Örn. `.../store/skill.md` → `.../store/` açılır.
 #[command]
 async fn reveal_in_file_manager(state: State<'_, VaultState>, name: String) -> Result<(), String> {
     use std::process::Command;
@@ -424,30 +425,26 @@ async fn reveal_in_file_manager(state: State<'_, VaultState>, name: String) -> R
     if !abs.exists() {
         return Err("Path does not exist".into());
     }
-    let target = abs.to_string_lossy().to_string();
-    let parent = abs
-        .parent()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|| target.clone());
+    // Her zaman bir KLASÖR açılır: dosya ise üst dizini.
+    let dir = if abs.is_dir() {
+        abs.clone()
+    } else {
+        abs.parent()
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| abs.clone())
+    };
+    let target = dir.to_string_lossy().to_string();
 
     #[cfg(target_os = "linux")]
     {
-        // Sırayla dene: xdg-open (dosya seçimi yok), gio open (seçim var),
-        // sonra masaüstü yöneticilerinin kendi komutları.
+        // Sırayla dene: xdg-open, gio open, sonra masaüstü yöneticileri.
         let attempts: Vec<Vec<String>> = vec![
-            if abs.is_dir() {
-                vec!["xdg-open".into(), target.clone()]
-            } else {
-                vec!["gio".into(), "open".into(), target.clone()]
-            },
-            if abs.is_dir() {
-                vec!["gio".into(), "open".into(), target.clone()]
-            } else {
-                vec!["xdg-open".into(), parent.clone()]
-            },
+            vec!["xdg-open".into(), target.clone()],
+            vec!["gio".into(), "open".into(), target.clone()],
             vec!["nautilus".into(), target.clone()],
             vec!["dolphin".into(), target.clone()],
             vec!["thunar".into(), target.clone()],
+            vec!["pcmanfm".into(), target.clone()],
         ];
         for args in attempts {
             let (bin, rest) = args.split_first().unwrap();
@@ -458,19 +455,13 @@ async fn reveal_in_file_manager(state: State<'_, VaultState>, name: String) -> R
                 return Ok(());
             }
         }
-        return Err("No file manager found (xdg-open, gio, nautilus, dolphin)".into());
+        return Err("No file manager found (xdg-open, gio, nautilus, dolphin, thunar)".into());
     }
 
     #[cfg(target_os = "macos")]
     {
-        let _ = parent;
-        let args: Vec<String> = if abs.is_dir() {
-            vec![target.clone()]
-        } else {
-            vec!["-R".into(), target.clone()]
-        };
         return Command::new("open")
-            .args(&args)
+            .arg(&target)
             .spawn()
             .map(|_| ())
             .map_err(|e| e.to_string());
@@ -478,14 +469,8 @@ async fn reveal_in_file_manager(state: State<'_, VaultState>, name: String) -> R
 
     #[cfg(target_os = "windows")]
     {
-        let _ = parent;
-        let arg = if abs.is_dir() {
-            target.clone()
-        } else {
-            format!("/select,{}", target)
-        };
         return Command::new("explorer")
-            .arg(arg)
+            .arg(&target)
             .spawn()
             .map(|_| ())
             .map_err(|e| e.to_string());
@@ -493,7 +478,7 @@ async fn reveal_in_file_manager(state: State<'_, VaultState>, name: String) -> R
 
     #[allow(unreachable_code)]
     {
-        let _ = (parent, target);
+        let _ = target;
         Ok(())
     }
 }

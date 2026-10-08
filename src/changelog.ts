@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 // Public CHANGELOG.md gerektiğinde bu listeden üretilir (çift kayıt yok).
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.4.4', date: '2026-10-09',
+    items: {
+      en: ['Right-click menu reworked: Open containing folder / Open this folder, Copy path, New note here, Rename, Delete.', 'Delete and open-location buttons now sit directly on every note and folder row (no right-click needed).', 'Opening a note’s location now opens its containing folder, not the file itself.'],
+      tr: ['Sağ tık menüsü yeniden: Bulunduğu konumu aç / Bu klasörü aç, Yolunu kopyala, Buraya yeni not ekle, Yeniden adlandır, Sil.', 'Sil ve konum aç düğmeleri artık her not ve klasör satırında doğrudan (sağ tık gerekmiyor).', 'Notun konumu artık dosyayı değil, içinde bulunduğu klasörü açıyor.'],
+      de: ['Rechtsklick-Menü überarbeitet: Enthaltenden Ordner öffnen, Pfad kopieren, Neue Notiz hier, Umbenennen, Löschen.', 'Löschen und Öffnen stehen jetzt direkt an jeder Notiz- und Ordnerzeile (kein Rechtsklick nötig).'],
+      fr: ['Menu contextuel refait : Ouvrir le dossier contenant, Copier le chemin, Nouvelle note ici, Renommer, Supprimer.', 'Supprimer et Ouvrir sont désormais sur chaque ligne (clic droit inutile).'],
+      es: ['Menú contextual rehecho: Abrir carpeta que lo contiene, Copiar ruta, Nueva nota aquí, Renombrar, Eliminar.', 'Eliminar y Abrir ya están en cada fila (no hace falta clic derecho).'],
+    },
+  },
+  {
     version: '0.4.3', date: '2026-10-07',
     items: {
       en: ['Right-click any folder or note: copy its full path, show it in your file manager, or delete it.', 'Folders can now be deleted (with a note count in the confirmation); open tabs, favorites and recents are cleaned up.', 'New "show in file manager" works on Linux, macOS and Windows.'],
