@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 // Public CHANGELOG.md gerektiğinde bu listeden üretilir (çift kayıt yok).
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.4.5', date: '2026-10-10',
+    items: {
+      en: ['Fixed: could not type in any field after closing Settings while a shortcut was waiting for a key press.', 'Underscores in names are now always visible (real monospace fallback fonts + no stroke thinning + no baseline clipping).'],
+      tr: ['Düzeltme: Ayarlar’da bir kısayol tuş beklerken pencereyi kapatınca hiçbir alana yazı yazılamıyordu.', 'İsimlerde alt çizgi (_) artık her zaman görünür (gerçek mono yedek font + ince çizgi soldurmama + taban kırpma yok).'],
+      de: ['Fix: Nach dem Schließen der Einstellungen während einer Tastenaufnahme war in keinem Feld mehr Eingabe möglich.', 'Unterstriche in Namen sind jetzt immer sichtbar (echte Mono-Fallbacks, keine Strichverdünnung, kein Abschneiden).'],
+      fr: ['Correction : impossible de saisir du texte après avoir fermé les Paramètres pendant l’enregistrement d’un raccourci.', 'Les tirets bas dans les noms sont maintenant toujours visibles (polices mono réelles, aucun amincissement).'],
+      es: ['Arreglo: no se podía escribir en ningún campo tras cerrar Ajustes mientras esperaba una tecla.', 'Los guiones bajos en los nombres ahora siempre se ven (fuentes mono reales, sin adelgazar trazos).'],
+    },
+  },
+  {
     version: '0.4.4', date: '2026-10-09',
     items: {
       en: ['Right-click menu reworked: Open containing folder / Open this folder, Copy path, New note here, Rename, Delete.', 'Delete and open-location buttons now sit directly on every note and folder row (no right-click needed).', 'Opening a note’s location now opens its containing folder, not the file itself.'],

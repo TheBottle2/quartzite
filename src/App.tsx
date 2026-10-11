@@ -242,6 +242,28 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isRecording]);
 
+  // Kaydedici AYARLAR kapanınca sıfırlanmalı. Kalırsa her tuşta
+  // preventDefault çalışır ve kullanıcı HİÇBİR alana yazı yazamaz.
+  useEffect(() => {
+    if (showSettings && isRecording) return;
+    if (isRecording || editingShortcut || recordedKeys.length > 0) {
+      setIsRecording(false);
+      setEditingShortcut(null);
+      setRecordedKeys([]);
+    }
+  }, [showSettings, isRecording, editingShortcut, recordedKeys.length]);
+
+  // Güvenlik ağı: kaydedici 10 saniye sonra kendini kapatır.
+  useEffect(() => {
+    if (!isRecording) return;
+    const timer = setTimeout(() => {
+      setIsRecording(false);
+      setEditingShortcut(null);
+      setRecordedKeys([]);
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [isRecording]);
+
   // Sekmeler: her açılan not listede tutulur (Obsidian tarzı).
   // Silinen notlar listeden düşer; ağaç güncellenince de temizlenir.
   useEffect(() => {
