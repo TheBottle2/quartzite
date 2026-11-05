@@ -81,6 +81,22 @@ export function Editor({
     mirror.style.wordBreak = cs.wordBreak;
   }, []);
 
+  // ---- Editör ↔ Önizleme senkron kaydırma ----
+  // Tek yönlü: yalnızca editör kaynak; önizlemenin kendi kaydırması geri
+  // bildirilmez (döngü yok). Orantılı (yüzde) eşleme: editörün görünür
+  // kısmının yüzdesi önizlemede aynı yüzdeye denk gelir. 0.5px eşik alt
+  // piksel titreşimini bastırır.
+  const syncPreviewScroll = useCallback(() => {
+    const ta = textareaRef.current, pane = previewRef.current;
+    if (!ta || !pane) return;
+    const paneAvail = pane.scrollHeight - pane.clientHeight;
+    if (paneAvail <= 0) return;
+    const taAvail = ta.scrollHeight - ta.clientHeight;
+    const ratio = taAvail > 0 ? Math.min(1, Math.max(0, ta.scrollTop / taAvail)) : 0;
+    const target = ratio * paneAvail;
+    if (Math.abs(pane.scrollTop - target) > 0.5) pane.scrollTop = target;
+  }, []);
+
   const scrollToCurrentMark = useCallback(() => {
     const ta = textareaRef.current, mirror = mirrorRef.current;
     if (!ta || !mirror) return false;
@@ -98,16 +114,23 @@ export function Editor({
       mirror.scrollLeft = left;
       ta.scrollLeft = left;
     }
+    syncPreviewScroll();
     return true;
-  }, []);
+  }, [syncPreviewScroll]);
 
   // Katman her belirdiğinde/güncellendiğinde kaydırma + oluğu eşitle.
   // Yoksa textarea kaydırılmışken açılan mirror tepede (scrollTop=0) kalır ve
   // ilk scroll'a kadar boş/yanlış bölümü işaretler.
   useLayoutEffect(() => {
-    if (showSearchBar && searchInfo.query.length > 0) syncMirrorScroll();
-  }, [showSearchBar, searchInfo, content, syncMirrorScroll]);
-  useLayoutEffect(() => { syncMirrorScroll(); }, [wordWrap, fontSize, syncMirrorScroll]);
+    if (showSearchBar && searchInfo.query.length > 0) { syncMirrorScroll(); syncPreviewScroll(); }
+  }, [showSearchBar, searchInfo, content, syncMirrorScroll, syncPreviewScroll]);
+  // Önizleme içeriği yeniden render olduğunda (yazma/undo sonrası 300ms
+  // debounce parse) oranı yeniden uygula; yoksa yükseklik değişen
+  // önizleme gözden kayar.
+  useEffect(() => {
+    requestAnimationFrame(() => { syncPreviewScroll(); });
+  }, [previewHtml, syncPreviewScroll]);
+  useLayoutEffect(() => { syncMirrorScroll(); syncPreviewScroll(); }, [wordWrap, fontSize, syncMirrorScroll, syncPreviewScroll]);
 
   // Vurgu ortaya çıksın: sorgu değişince ilk isabeti de ortala (seçim yokken
   // bile). Seçime bağlı ortala zaten selectRange içinde yapılıyor.
@@ -215,8 +238,10 @@ export function Editor({
       const ta = textareaRef.current;
       if (ta) { ta.focus(); ta.setSelectionRange(s, e); }
       isUndoRedo.current = false;
+      // Undo/redo seçimi textarea'yı kaydırabilir; önizleme yanıp kalmasın.
+      requestAnimationFrame(() => { syncPreviewScroll(); });
     }, 0);
-  }, [onContentChange, fileName, debouncedSave]);
+  }, [onContentChange, fileName, debouncedSave, syncPreviewScroll]);
 
   const undo = useCallback(() => {
     if (indexRef.current <= 0) return;
@@ -249,10 +274,12 @@ export function Editor({
     const line = ta.value.slice(0, start).split('\n').length - 1;
     ta.scrollTop = Math.max(0, line * lineHeight - ta.clientHeight / 2);
     syncMirrorScroll();
+    syncPreviewScroll();
     requestAnimationFrame(() => {
       if (!scrollToCurrentMark()) requestAnimationFrame(() => { scrollToCurrentMark(); });
+      syncPreviewScroll();
     });
-  }, [syncMirrorScroll, scrollToCurrentMark]);
+  }, [syncMirrorScroll, scrollToCurrentMark, syncPreviewScroll]);
 
   // Dışarıdan gelen "şu isabete git" isteğini bir kez uygula (arama yönlendirmesi).
   // Dosya yeni açıldıysa textarea henüz boyalanmamış olabilir — bir kare bekle.
@@ -265,6 +292,19 @@ export function Editor({
       });
     }
   }, [pendingSelect, fileName, selectRange, onPendingSelectConsumed]);
+
+  // Textarea her kaydında mirror + önizleme birlikte güncellenir.
+  const handleEditorScroll = useCallback(() => {
+    syncMirrorScroll();
+    syncPreviewScroll();
+  }, [syncMirrorScroll, syncPreviewScroll]);
+
+  // Editör yarısı gizlenip geri açıldığında bir kez hizala.
+  useEffect(() => {
+    if (!showEditor) return;
+    const raf = requestAnimationFrame(() => { syncPreviewScroll(); });
+    return () => cancelAnimationFrame(raf);
+  }, [showEditor, syncPreviewScroll]);
 
   // Bayat programatik seçimi temizle: sorgu/seçenek değişince isabet kümesi
   // yenilenir; eski mavi seçim ekranda asılı kalır ve "yanlış bölge" gibi
@@ -612,7 +652,7 @@ export function Editor({
                 value={content}
                 onChange={handleChange}
                 onKeyDown={handleKeyDown}
-                onScroll={syncMirrorScroll}
+                onScroll={handleEditorScroll}
                 onCompositionStart={() => { composingRef.current = true; }}
                 onCompositionEnd={() => { composingRef.current = false; }}
                 placeholder={t('editorPlaceholder')}

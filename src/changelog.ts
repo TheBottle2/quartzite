@@ -10,6 +10,16 @@ export interface ChangelogEntry {
 // Public CHANGELOG.md gerektiğinde bu listeden üretilir (çift kayıt yok).
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.4.6', date: '2026-11-05',
+    items: {
+      en: ['Icons migrated to Iconify (Lucide): one shared system across all components; inline SVGs removed.', 'Added: scroll sync — in split view the preview follows the editor proportionally while you scroll or navigate (wheel, keys, search jump, undo).'],
+      tr: ['İkonlar Iconify (Lucide) sistemine taşındı: tüm bileşenlerde tek paylaşılan ikon seti; satır-içi SVG’ler kaldırıldı.', 'Eklendi: senkron kaydırma — bölünmüş görünümde önizleme, editörü kaydırırken/gezinirken orantılı olarak birlikte kayar (tekerlek, tuşlar, arama sıçraması, undo).'],
+      de: ['Icons auf Iconify (Lucide) umgestellt: ein gemeinsames Set für alle Komponenten; Inline-SVGs entfernt.', 'Neu: Scroll-Sync — die Vorschau rollt beim Scrollen und Navigieren im Editor proportional mit (Rad, Tasten, Sprung zur Suche, Undo).'],
+      fr: ['Icônes migrées vers Iconify (Lucide) : un set unifié pour tous les composants ; SVG en ligne supprimés.', 'Nouveau : synchronisation du défilement — l’aperçu suit proportionnellement le défilement de l’éditeur (molette, clavier, saut de recherche, annulation).'],
+      es: ['Iconos migrados a Iconify (Lucide): un set unificado para todos los componentes; SVG en línea eliminados.', 'Nuevo: sincronización de desplazamiento — la vista previa sigue proporcionalmente el desplazamiento del editor (rueda, teclado, salto de búsqueda, deshacer).'],
+    },
+  },
+  {
     version: '0.4.5', date: '2026-10-10',
     items: {
       en: ['Fixed: could not type in any field after closing Settings while a shortcut was waiting for a key press.', 'Underscores in names are now always visible (real monospace fallback fonts + no stroke thinning + no baseline clipping).'],
