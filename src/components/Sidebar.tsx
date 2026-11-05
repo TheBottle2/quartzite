@@ -301,12 +301,7 @@ export function Sidebar({
         onContextMenu={(e) => openMenu(e, 'file', file)}
         title={searching ? file : `Sürükleyerek klasöre taşı — ${file}`}
       >
-        <span className="file-icon" aria-hidden="true">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-          </svg>
-        </span>
+        <span className="file-icon" aria-hidden="true"><Icon name="file" size={16} /></span>
         <span className="file-name">{(nested ? baseOf(file) : file).replace(/\.md$/, '')}</span>
         {searching && hits > 0 && (
           <span className="file-hits" title={t('contentHits', { count: String(hits) })}>{hits}</span>
@@ -371,9 +366,7 @@ export function Sidebar({
             aria-expanded={isOpen}
             title={isOpen ? t('collapseFolder') : t('expandFolder')}
           >
-            <svg className={`chevron-icon${isOpen ? '' : ' collapsed'}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
+            <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} size={14} className="chevron-icon" aria-hidden={true} />
             <span className="folder-icon" aria-hidden="true"><Icon name="folder" size={14} /></span>
             <span className="folder-name">{folder}</span>
             <span className="folder-count">{folderFiles.length}</span>
@@ -503,9 +496,7 @@ export function Sidebar({
             title={isCalendarCollapsed ? t('showCalendar') : t('hideCalendar')}
           >
             <span className="calendar-title">{t('calendar')}</span>
-            <svg className={`chevron-icon ${isCalendarCollapsed ? 'collapsed' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
+            <Icon name={isCalendarCollapsed ? 'chevron-right' : 'chevron-down'} size={14} className={`chevron-icon ${isCalendarCollapsed ? 'collapsed' : ''}`} aria-hidden={true} />
           </button>
           <div id="calendar-panel" className={`calendar-content ${isCalendarCollapsed ? 'hidden' : ''}`}>
             <Calendar
@@ -521,10 +512,7 @@ export function Sidebar({
       )}
       <div className="sidebar-new-note" style={{ display: 'flex', gap: '8px' }}>
         <button className="btn primary" onClick={onNewNote} style={{ flex: 1, justifyContent: 'center' }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
+          <Icon name="plus" size={16} />
           <span style={{ marginLeft: 8 }}>{t('scNewNote')}</span>
         </button>
         <button className="btn secondary" onClick={onNewFolder} title={t('createFolder')} aria-label={t('createFolder')} style={{ width: '40px', justifyContent: 'center', padding: '8px' }}>

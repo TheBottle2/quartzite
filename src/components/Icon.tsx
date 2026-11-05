@@ -1,67 +1,255 @@
-import React from 'react';
+import { Icon as IconifyIcon } from '@iconify/react';
 
-export type IconName =
-  | 'menu' | 'plus' | 'refresh' | 'pen' | 'graph' | 'settings' | 'folder'
-  | 'eye' | 'eye-off' | 'trash'
-  | 'bold' | 'italic' | 'underline' | 'strikethrough'
-  | 'list' | 'list-ordered' | 'undo' | 'redo'
-  | 'link' | 'image' | 'quote' | 'code'
-  | 'x' | 'search' | 'chevron-up' | 'chevron-down' | 'replace'
-  | 'download' | 'camera' | 'map'
-  | 'star' | 'command' | 'calendar' | 'hash' | 'list-tree' | 'file' | 'sun' | 'moon' | 'tag'
-  | 'copy' | 'external-link' | 'more-horizontal';
-
-const PATHS: Record<IconName, React.ReactNode> = {
-  menu: (<><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></>),
-  plus: (<><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></>),
-  refresh: (<><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></>),
-  pen: (<><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="M15 5l4 4" /></>),
-  graph: (<><circle cx="8" cy="12" r="3" /><circle cx="16" cy="12" r="3" /><path d="M11 12h6" /></>),
-  settings: (<><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /><circle cx="12" cy="12" r="3" /></>),
-  folder: (<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />),
-  eye: (<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>),
-  'eye-off': (<><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></>),
-  trash: (<><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></>),
-  bold: (<><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z" /><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z" /></>),
-  italic: (<><line x1="19" y1="4" x2="10" y2="4" /><line x1="14" y1="20" x2="5" y2="20" /><line x1="15" y1="4" x2="9" y2="20" /></>),
-  underline: (<><path d="M6 3v7a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3" /><line x1="4" y1="21" x2="20" y2="21" /></>),
-  strikethrough: (<><path d="M16 4H9a3 3 0 0 0-2.83 4" /><path d="M14 12a4 4 0 0 1 0 8H6" /><line x1="4" y1="12" x2="20" y2="12" /></>),
-  list: (<><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></>),
-  'list-ordered': (<><line x1="10" y1="6" x2="21" y2="6" /><line x1="10" y1="12" x2="21" y2="12" /><line x1="10" y1="18" x2="21" y2="18" /><path d="M4 6h1v4" /><path d="M4 10h2" /><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1" /></>),
-  undo: (<><path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" /></>),
-  redo: (<><path d="M21 7v6h-6" /><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" /></>),
-  link: (<><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></>),
-  image: (<><rect x="3" y="3" width="18" height="18" rx="2" ry="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></>),
-  quote: (<><path d="M10 11H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v6a4 4 0 0 1-4 4" /><path d="M20 11h-4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v6a4 4 0 0 1-4 4" /></>),
-  code: (<><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></>),
-  x: (<><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></>),
-  search: (<><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></>),
-  'chevron-up': (<polyline points="18 15 12 9 6 15" />),
-  'chevron-down': (<polyline points="6 9 12 15 18 9" />),
-  replace: (<><path d="m17 2 4 4-4 4" /><path d="M3 11v-1a4 4 0 0 1 4-4h14" /><path d="m7 22-4-4 4-4" /><path d="M21 13v1a4 4 0 0 1-4 4H3" /></>),
-  download: (<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></>),
-  camera: (<><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" /><circle cx="12" cy="13" r="3" /></>),
-  map: (<><path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z" /><path d="M15 5.764v15" /><path d="M9 3.236v15" /></>),
-  star: (<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />),
-  command: (<path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3" />),
-  calendar: (<><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></>),
-  hash: (<><line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" /><line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" /></>),
-  'list-tree': (<><path d="M21 12h-8" /><path d="M21 6H8" /><path d="M21 18h-8" /><path d="M3 6v4c0 1.1.9 2 2 2h3" /><path d="M3 10v6c0 1.1.9 2 2 2h3" /></>),
-  copy: (<><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>),
-  'external-link': (<><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></>),
-  'more-horizontal': (<><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /><circle cx="5" cy="12" r="1.5" /></>),
-  tag: (<><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" /><circle cx="7.5" cy="7.5" r="1.5" fill="currentColor" /></>),
-  sun: (<><circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" /></>),
-  moon: (<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />),
-  file: (<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></>),
+/**
+ * Icon name mappings from our internal names to Lucide icon names.
+ * This allows us to keep a stable API while using Lucide icons underneath.
+ */
+export const ICON_MAP: Record<string, string> = {
+  // Navigation & UI
+  'menu': 'lucide:menu',
+  'plus': 'lucide:plus',
+  'refresh': 'lucide:refresh-cw',
+  'pen': 'lucide:pen',
+  'graph': 'lucide:git-graph',
+  'settings': 'lucide:settings',
+  'folder': 'lucide:folder',
+  'eye': 'lucide:eye',
+  'eye-off': 'lucide:eye-off',
+  'trash': 'lucide:trash',
+  'x': 'lucide:x',
+  'search': 'lucide:search',
+  'chevron-up': 'lucide:chevron-up',
+  'chevron-down': 'lucide:chevron-down',
+  'chevron-left': 'lucide:chevron-left',
+  'chevron-right': 'lucide:chevron-right',
+  'more-horizontal': 'tabler:dots', // Not in Lucide, use Tabler equivalent
+  'download': 'lucide:download',
+  'camera': 'lucide:camera',
+  'map': 'lucide:map',
+  'copy': 'lucide:copy',
+  'external-link': 'lucide:external-link',
+  'command': 'lucide:command',
+  'calendar': 'lucide:calendar',
+  'hash': 'lucide:hash',
+  'list-tree': 'lucide:git-branch',
+  'file': 'lucide:file',
+  'sun': 'lucide:sun',
+  'moon': 'lucide:moon',
+  'tag': 'lucide:tag',
+  'star': 'lucide:star',
+  'home': 'lucide:home',
+  'arrow-left': 'lucide:arrow-left',
+  'arrow-right': 'lucide:arrow-right',
+  'arrow-up': 'lucide:arrow-up',
+  'arrow-down': 'lucide:arrow-down',
+  'check': 'lucide:check',
+  'check-circle': 'lucide:check-circle',
+  'alert-circle': 'lucide:alert-circle',
+  'alert-triangle': 'lucide:alert-triangle',
+  'info': 'lucide:info',
+  'help-circle': 'lucide:help-circle',
+  'loader': 'lucide:loader',
+  'rotate-cw': 'lucide:rotate-cw',
+  'rotate-ccw': 'lucide:rotate-ccw',
+  'maximize': 'lucide:maximize',
+  'minimize': 'lucide:minimize',
+  'sidebar': 'lucide:layout-sidebar',
+  'panel-left': 'lucide:panel-left',
+  'panel-right': 'lucide:panel-right',
+  'grid': 'lucide:grid',
+  'layers': 'lucide:layers',
+  'link': 'lucide:link',
+  'unlink': 'lucide:unlink',
+  'share': 'lucide:share-2',
+  'heart': 'lucide:heart',
+  'bookmark': 'lucide:bookmark',
+  'flag': 'lucide:flag',
+  'bell': 'lucide:bell',
+  'bell-off': 'lucide:bell-off',
+  'user': 'lucide:user',
+  'users': 'lucide:users',
+  'lock': 'lucide:lock',
+  'unlock': 'lucide:unlock',
+  'key': 'lucide:key',
+  'shield': 'lucide:shield',
+  'activity': 'lucide:activity',
+  'zap': 'lucide:zap',
+  'cpu': 'lucide:cpu',
+  'database': 'lucide:database',
+  'server': 'lucide:server',
+  'cloud': 'lucide:cloud',
+  'wifi': 'lucide:wifi',
+  'wifi-off': 'lucide:wifi-off',
+  'bluetooth': 'lucide:bluetooth',
+  'usb': 'lucide:usb',
+  'monitor': 'lucide:monitor',
+  'smartphone': 'lucide:smartphone',
+  'tablet': 'lucide:tablet',
+  'laptop': 'lucide:laptop',
+  'printer': 'lucide:printer',
+  'camera-off': 'lucide:camera-off',
+  'mic': 'lucide:mic',
+  'mic-off': 'lucide:mic-off',
+  'volume': 'lucide:volume-2',
+  'volume-off': 'lucide:volume-x',
+  'headphones': 'lucide:headphones',
+  'music': 'lucide:music',
+  'film': 'lucide:film',
+  'image': 'lucide:image',
+  'video': 'lucide:video',
+  'video-off': 'lucide:video-off',
+  'play': 'lucide:play',
+  'pause': 'lucide:pause',
+  'stop': 'lucide:stop',
+  'skip-forward': 'lucide:skip-forward',
+  'skip-back': 'lucide:skip-back',
+  'fast-forward': 'lucide:fast-forward',
+  'rewind': 'lucide:rewind',
+  'repeat': 'lucide:repeat',
+  'shuffle': 'lucide:shuffle',
+  'list': 'lucide:list',
+  'list-ordered': 'lucide:list-ordered',
+  'list-todo': 'lucide:list-todo',
+  'layout-list': 'lucide:layout-list',
+  'layout-grid': 'lucide:layout-grid',
+  'align-left': 'lucide:align-left',
+  'align-center': 'lucide:align-center',
+  'align-right': 'lucide:align-right',
+  'align-justify': 'lucide:align-justify',
+  'bold': 'lucide:bold',
+  'italic': 'lucide:italic',
+  'underline': 'lucide:underline',
+  'strikethrough': 'lucide:strikethrough',
+  'code': 'lucide:code',
+  'code-2': 'lucide:code-2',
+  'terminal': 'lucide:terminal',
+  'quote': 'lucide:quote',
+  'heading-1': 'lucide:heading-1',
+  'heading-2': 'lucide:heading-2',
+  'heading-3': 'lucide:heading-3',
+  'paragraph': 'lucide:paragraph',
+  'type': 'lucide:type',
+  'text': 'lucide:file-text',
+  'undo': 'lucide:undo',
+  'redo': 'lucide:redo',
+  'replace': 'lucide:replace',
+  'find': 'lucide:search',
+  'filter': 'lucide:filter',
+  'sort-asc': 'lucide:sort-asc',
+  'sort-desc': 'lucide:sort-desc',
+  'move': 'lucide:move',
+  'grip': 'lucide:grip',
+  'grip-vertical': 'lucide:grip-vertical',
+  'grip-horizontal': 'lucide:grip-horizontal',
+  'expand': 'lucide:expand',
+  'shrink': 'lucide:shrink',
+  'corner-up-left': 'lucide:corner-up-left',
+  'corner-up-right': 'lucide:corner-up-right',
+  'corner-down-left': 'lucide:corner-down-left',
+  'corner-down-right': 'lucide:corner-down-right',
+  'scan': 'lucide:scan',
+  'scan-line': 'lucide:scan-line',
+  'barcode': 'lucide:barcode',
+  'qrcode': 'lucide:qrcode',
+  'credit-card': 'lucide:credit-card',
+  'gift': 'lucide:gift',
+  'package': 'lucide:package',
+  'box': 'lucide:box',
+  'archive': 'lucide:archive',
+  'inbox': 'lucide:inbox',
+  'mail': 'lucide:mail',
+  'send': 'lucide:send',
+  'message-square': 'lucide:message-square',
+  'message-circle': 'lucide:message-circle',
+  'chat': 'lucide:chat',
+  'comment': 'lucide:message-square-text',
+  'discussion': 'lucide:message-square-more',
+  'notification': 'lucide:bell-ring',
+  'rss': 'lucide:rss',
+  'atom': 'lucide:atom',
+  'globe': 'lucide:globe',
+  'map-pin': 'lucide:map-pin',
+  'navigation': 'lucide:navigation',
+  'compass': 'lucide:compass',
+  'anchor': 'lucide:anchor',
+  'target': 'lucide:target',
+  'crosshair': 'lucide:crosshair',
+  'zoom-in': 'lucide:zoom-in',
+  'zoom-out': 'lucide:zoom-out',
+  'maximize-2': 'lucide:maximize-2',
+  'minimize-2': 'lucide:minimize-2',
+  'fullscreen': 'lucide:fullscreen',
+  'fullscreen-exit': 'lucide:minimize-2',
 };
 
-export function Icon({ name, size = 14 }: { name: IconName; size?: number }) {
+/**
+ * Type for all available icon names (our internal names).
+ * This provides autocomplete in IDEs.
+ */
+export type IconName = keyof typeof ICON_MAP;
+
+/**
+ * Props for the Icon component.
+ */
+export interface IconProps {
+  /** The icon name (from ICON_MAP keys) */
+  name: IconName;
+  /** Size in pixels (default: 14) */
+  size?: number;
+  /** Color (default: currentColor) */
+  color?: string;
+  /** Additional className */
+  className?: string;
+  /** Inline style */
+  style?: React.CSSProperties;
+  /** aria-label for accessibility */
+  'aria-label'?: string;
+  /** aria-hidden (default: true for decorative icons) */
+  'aria-hidden'?: boolean;
+}
+
+/**
+ * Icon component using @iconify/react with Lucide as primary set.
+ * 
+ * Usage:
+ *   <Icon name="menu" size={20} />
+ *   <Icon name="settings" color="red" />
+ *   <Icon name="star" className="my-icon" />
+ */
+export function Icon({ 
+  name, 
+  size = 14, 
+  color = 'currentColor',
+  className,
+  style,
+  'aria-label': ariaLabel,
+  'aria-hidden': ariaHidden = true,
+  ...props
+}: IconProps) {
+  const iconName = ICON_MAP[name];
+  
+  if (!iconName) {
+    console.warn(`Icon "${name}" not found in ICON_MAP`);
+    return null;
+  }
+
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-      style={{ flexShrink: 0, display: 'block', overflow: 'visible' }}>
-      {PATHS[name]}
-    </svg>
+    <IconifyIcon
+      icon={iconName}
+      width={size}
+      height={size}
+      style={{ 
+        color, 
+        flexShrink: 0, 
+        display: 'inline-block',
+        ...style 
+      }}
+      className={className}
+      aria-label={ariaLabel}
+      aria-hidden={ariaHidden}
+      {...props}
+    />
   );
 }
+
+export default Icon;
