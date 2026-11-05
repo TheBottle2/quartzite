@@ -218,13 +218,26 @@ export interface IconProps {
  *   <Icon name="star" className="my-icon" />
  */
 // ---- Offline ikonlar ----
-// Tüm ikonlar build-time'da src/icons/bundle.json'a damıtılır ve daha önce
-// kaydedilir. @iconify/react'in OFFLINE girişini kullanıyoruz → runtime'da
-// api.iconify.design'a hiç bağlanılmaz (yerel-first, ağdan bağımsız).
-// Dizi: her IconifyJSON tek prefix taşıyabilir (lucide, tabler…).
-// JSON import'un çıkarımsı tipi genelde geniş olmadığından unknown üzerinden
-// daraltıyoruz; içerik build betiğince IconifyJSON şemasına göre üretilir.
-addCollection(bundle as unknown as IconifyJSON);
+// Tüm ikonlar build-time'da src/icons/bundle.json'a damıtılır ve bileşenler
+// daha önce kaydedilir. @iconify/react'in OFFLINE girişini kullanıyoruz →
+// runtime'da api.iconify.design'a hiç bağlanılmaz (yerel-first, ağdan bağımsız).
+// DİKKAT: bundle bir DİZİDİR; her IconifyJSON yalnızca tek prefix taşır
+// (lucide + tabler) → her öge ayrı kaydedilir. Tek addCollection'e "as cast"
+// ile geçmek sizi sessizce bozuk kayda sürükler ve HİÇBİR ikon görünmez.
+let registeredCollections = 0;
+for (const collection of bundle as unknown as IconifyJSON[]) {
+  try {
+    addCollection(collection);
+    registeredCollections++;
+  } catch (err) {
+    console.error(`[Icon] IconifyJSON kaydı başarısız (${(collection as { prefix?: string }).prefix}):`, err);
+  }
+}
+// Sessiz boş kayıt: bu durumda offline ikon HİÇBİR yerde görünmez. Bir kez
+// ve yalnızca geliştirme modunda görünür sinyal ver.
+if (registeredCollections === 0 && import.meta.env.DEV) {
+  console.warn('[Icon] Hiçbir icon seti kaydedilemedi — ikonlar boş görünür!');
+}
 
 export function Icon({
   name,
