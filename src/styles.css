@@ -84,6 +84,25 @@ body { font-family: var(--font-ui); background: var(--bg-primary); color: var(--
 .preview-content h1 { font-size: 24px; } .preview-content h2 { font-size: 20px; }
 .preview-content h3 { font-size: 18px; color: var(--accent); } .preview-content h4 { font-size: 16px; }
 .preview-content h5 { font-size: 14px; } .preview-content h6 { font-size: 13px; color: var(--fg-secondary); }
+
+/* ===== Başlık bölümlerini katlama (kapatma) butonu =====
+   Wiki/site görünümü: her başlığın solunda katlama oku; tıklanınca bölümün
+   gövdesi (alt bölümleriyle birlikte) kapanır. Durum dosya başına localStorage'da. */
+.preview-content .fold-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; margin-right: 4px; padding: 0;
+  border: none; border-radius: 4px; background: transparent;
+  color: var(--fg-muted); cursor: pointer; vertical-align: middle;
+  transition: color .12s ease, background .12s ease;
+}
+.preview-content .fold-btn:hover { color: var(--fg-primary); background: var(--bg-tertiary); }
+.preview-content .fold-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.preview-content .fold-btn svg { transition: transform .15s ease; transform: rotate(90deg); }
+/* Kapalı bölüm: ok sağa döner, gövde gizlenir. */
+.preview-content .preview-section.folded > :is(h1,h2,h3,h4,h5,h6) > .fold-btn svg { transform: rotate(0deg); }
+.preview-content .preview-section.folded > .preview-section-body { display: none; }
+/* Kapalı bölümün başlığı biraz daha belirgin olsun (site görünümü). */
+.preview-content .preview-section.folded > :is(h1,h2,h3,h4,h5,h6) { margin-bottom: 0.35em; }
 .preview-content p { margin: 0.75em 0; }
 .preview-content ul { margin: 0.75em 0; padding-left: 24px; list-style-type: disc; }
 .preview-content ol { margin: 0.75em 0; padding-left: 24px; list-style-type: decimal; }

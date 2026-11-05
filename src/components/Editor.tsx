@@ -3,6 +3,7 @@ import { parseMarkdown, writeFile, confirmDialog, readFile } from '../api';
 import { useDebounce } from '../hooks/useDebounce';
 import { renderMathInHtml } from '../math';
 import { enhancePreviewHtml, extractFrontmatter, frontmatterTable, taskLineIndices } from '../utils/preview';
+import { applyFoldSections, loadFolds, saveFolds, toggleFold } from '../utils/fold';
 import { Logo } from './Logo';
 import { Icon } from './Icon';
 import { SearchBar, type SearchMatch } from './SearchBar';
@@ -46,9 +47,12 @@ export function Editor({
 }: EditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const previewContentRef = useRef<HTMLDivElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
   const composingRef = useRef(false);
   const [previewHtml, setPreviewHtml] = useState('');
+  // Katlanmış (kapatılmış) bölüm anahtarları — dosya başına saklanır.
+  const foldedKeysRef = useRef<Set<string>>(new Set());
   const pendingSave = useRef<{ name: string; text: string } | null>(null);
   // Bul/değiştir vurgu katmanı verisi (SearchBar'dan beslenir)
   const [searchInfo, setSearchInfo] = useState<{ query: string; matches: SearchMatch[]; current: number }>(
@@ -261,6 +265,20 @@ export function Editor({
     if (fileName) debouncedParse(content);
     else setPreviewHtml('');
   }, [content, fileName, debouncedParse]);
+
+  // Başlık bölümlerini katlanabilir yap (wiki/site görünümü) ve önceki
+  // katlanma durumunu (localStorage) geri yükle. Önizleme her yeniden
+  // parse'da DOM'u değiştirdiği için durum anahtarlarıyla saklanıp
+  // yeniden uygulanır.
+  useEffect(() => {
+    const root = previewContentRef.current;
+    if (!root || !fileName) return;
+    foldedKeysRef.current = loadFolds(fileName);
+    applyFoldSections(root, foldedKeysRef.current, {
+      fold: t('foldSection'),
+      unfold: t('unfoldSection'),
+    });
+  }, [previewHtml, fileName, t]);
 
   // ---- Arama çubuğu yardımcıları ----
   const selectRange = useCallback((start: number, end: number) => {
@@ -676,6 +694,24 @@ export function Editor({
           className="preview-pane"
           onClick={(e) => {
             const target = e.target as HTMLElement;
+            // Katlama (kapatma) butonu: bölümü aç/kapat. Diğer kurallardan ÖNCE
+            // ele alınır ki link/task tıklamalarıyla karışmasın.
+            const foldBtn = target.closest('.fold-btn') as HTMLElement | null;
+            if (foldBtn) {
+              e.preventDefault();
+              e.stopPropagation();
+              const key = foldBtn.dataset.foldKey;
+              const root = previewContentRef.current;
+              if (key && root && fileName) {
+                const nowFolded = toggleFold(root, key, foldedKeysRef.current);
+                saveFolds(fileName, foldedKeysRef.current);
+                const label = nowFolded ? t('unfoldSection') : t('foldSection');
+                foldBtn.setAttribute('aria-expanded', nowFolded ? 'false' : 'true');
+                foldBtn.setAttribute('title', label);
+                foldBtn.setAttribute('aria-label', label);
+              }
+              return;
+            }
             const task = target.closest('input.task-checkbox') as HTMLInputElement | null;
             if (task) {
               e.preventDefault();
@@ -716,7 +752,7 @@ export function Editor({
               <div className="preview-empty-text">{t('emptyNote')}</div>
             </div>
           ) : (
-            <div className="preview-content" style={{ fontSize: `${fontSize}px` }} dangerouslySetInnerHTML={{ __html: previewHtml }} />
+            <div ref={previewContentRef} className="preview-content" style={{ fontSize: `${fontSize}px` }} dangerouslySetInnerHTML={{ __html: previewHtml }} />
           )}
         </div>
       </div>
