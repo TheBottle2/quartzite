@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/build-icons.mjs",
     "build": "tsc && vite build",
+    "icons:build": "node scripts/build-icons.mjs",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
@@ -23,6 +25,8 @@
     "vis-network": "^10.1.2"
   },
   "devDependencies": {
+    "@iconify-json/lucide": "^1.2.151",
+    "@iconify-json/tabler": "^1.2.43",
     "@tauri-apps/cli": "^2",
     "@types/d3": "^7.4.3",
     "@types/react": "^18.2.0",

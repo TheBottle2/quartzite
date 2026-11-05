@@ -1,4 +1,5 @@
-import { Icon as IconifyIcon } from '@iconify/react';
+import { Icon as IconifyIcon, addCollection, type IconifyJSON } from '@iconify/react/dist/offline';
+import bundle from '../icons/bundle.json';
 
 /**
  * Icon name mappings from our internal names to Lucide icon names.
@@ -53,7 +54,7 @@ export const ICON_MAP: Record<string, string> = {
   'rotate-ccw': 'lucide:rotate-ccw',
   'maximize': 'lucide:maximize',
   'minimize': 'lucide:minimize',
-  'sidebar': 'lucide:layout-sidebar',
+  'sidebar': 'lucide:panel-left', // güncel Lucide'da layout-sidebar yok → panel-left
   'panel-left': 'lucide:panel-left',
   'panel-right': 'lucide:panel-right',
   'grid': 'lucide:grid',
@@ -100,7 +101,7 @@ export const ICON_MAP: Record<string, string> = {
   'video-off': 'lucide:video-off',
   'play': 'lucide:play',
   'pause': 'lucide:pause',
-  'stop': 'lucide:stop',
+  'stop': 'lucide:circle-stop', // güncel Lucide'da stop yok → circle-stop
   'skip-forward': 'lucide:skip-forward',
   'skip-back': 'lucide:skip-back',
   'fast-forward': 'lucide:fast-forward',
@@ -127,7 +128,7 @@ export const ICON_MAP: Record<string, string> = {
   'heading-1': 'lucide:heading-1',
   'heading-2': 'lucide:heading-2',
   'heading-3': 'lucide:heading-3',
-  'paragraph': 'lucide:paragraph',
+  'paragraph': 'lucide:letter-text', // güncel Lucide'da paragraph yok → letter-text
   'type': 'lucide:type',
   'text': 'lucide:file-text',
   'undo': 'lucide:undo',
@@ -150,7 +151,7 @@ export const ICON_MAP: Record<string, string> = {
   'scan': 'lucide:scan',
   'scan-line': 'lucide:scan-line',
   'barcode': 'lucide:barcode',
-  'qrcode': 'lucide:qrcode',
+  'qrcode': 'lucide:qr-code', // güncel Lucide'da qrcode yok → qr-code
   'credit-card': 'lucide:credit-card',
   'gift': 'lucide:gift',
   'package': 'lucide:package',
@@ -161,7 +162,7 @@ export const ICON_MAP: Record<string, string> = {
   'send': 'lucide:send',
   'message-square': 'lucide:message-square',
   'message-circle': 'lucide:message-circle',
-  'chat': 'lucide:chat',
+  'chat': 'lucide:message-circle', // güncel Lucide'da chat yok → message-circle
   'comment': 'lucide:message-square-text',
   'discussion': 'lucide:message-square-more',
   'notification': 'lucide:bell-ring',
@@ -216,9 +217,18 @@ export interface IconProps {
  *   <Icon name="settings" color="red" />
  *   <Icon name="star" className="my-icon" />
  */
-export function Icon({ 
-  name, 
-  size = 14, 
+// ---- Offline ikonlar ----
+// Tüm ikonlar build-time'da src/icons/bundle.json'a damıtılır ve daha önce
+// kaydedilir. @iconify/react'in OFFLINE girişini kullanıyoruz → runtime'da
+// api.iconify.design'a hiç bağlanılmaz (yerel-first, ağdan bağımsız).
+// Dizi: her IconifyJSON tek prefix taşıyabilir (lucide, tabler…).
+// JSON import'un çıkarımsı tipi genelde geniş olmadığından unknown üzerinden
+// daraltıyoruz; içerik build betiğince IconifyJSON şemasına göre üretilir.
+addCollection(bundle as unknown as IconifyJSON);
+
+export function Icon({
+  name,
+  size = 14,
   color = 'currentColor',
   className,
   style,
